@@ -4,7 +4,7 @@ from nautilus_trader.trading import Strategy
 from nautilus_trader.execution import FixedFeeModel
 from nautilus_trader.model import (AccountType, OmsType, Money, Currency,
                                   BarType, QuoteTick, Price, Quantity)
-from lq_adapter_ctrader.provider import instrument_from_wire
+from tl_store.ctrader.provider import instrument_from_wire
 
 
 def test_official_internal_mid_bars_use_adapter_instrument_and_quotes():

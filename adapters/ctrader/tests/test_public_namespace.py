@@ -1,14 +1,17 @@
-"""The installed distribution is TL-Store; cTrader is its first built-in adapter."""
+"""Installed a3 has one implementation namespace and the official NA boundary."""
 from importlib.metadata import distribution, PackageNotFoundError
+from importlib.util import find_spec
 import pytest
 
 
-def test_public_namespace_reuses_existing_classes_without_forwarders():
+def test_public_namespace_owns_classes_and_native_without_old_alias():
     from tl_store import ctrader
-    import lq_adapter_ctrader as implementation
-    assert ctrader.CTraderDataClientFactory is implementation.CTraderDataClientFactory
-    assert ctrader.CTraderAccountSession is implementation.CTraderAccountSession
-    assert distribution('tl-store').version == '0.2.1a2'
+    from tl_store.ctrader import _native
+    assert ctrader.CTraderDataClientFactory.__module__ == 'tl_store.ctrader.factories'
+    assert ctrader.CTraderAccountSession.__module__ == 'tl_store.ctrader.session'
+    assert _native.__name__ == 'tl_store.ctrader._native'
+    assert find_spec('lq_adapter_ctrader') is None
+    assert distribution('tl-store').version == '0.2.1a3'
     with pytest.raises(PackageNotFoundError):
         distribution('lq-adapter-ctrader')
     assert not any('trade-learn' in r or 'leafquant' in r for r in distribution('tl-store').requires)

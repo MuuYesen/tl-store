@@ -2,7 +2,7 @@
 import asyncio
 import pytest
 from tl_store.ctrader import CTraderConfig
-from lq_adapter_ctrader.provider import load_contracts
+from tl_store.ctrader.provider import load_contracts
 
 
 class Metadata:

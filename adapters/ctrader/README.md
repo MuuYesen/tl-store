@@ -1,6 +1,6 @@
 # cTrader built-in adapter
 
-cTrader is included in the `tl-store==0.2.1a2` alpha distribution and exposed as
+cTrader is included in the `tl-store==0.2.1a3` alpha distribution and exposed as
 `tl_store.ctrader`; it is not a separate cTrader distribution. Distribution metadata
 and release builds belong to the collection root. The protocol crate is 0.2.1; the instance-credential constructor and metadata
 requests require a newly compiled native extension. Earlier wheels are not relabelled. See the collection README for exact
@@ -116,7 +116,7 @@ token or assume cloud verification has occurred. No endpoint+token API is promis
 | Target | Native build | Qualification |
 |---|---|---|
 | macOS 11+ arm64, CPython 3.13 | Optimized Release, opt-level 3, Rust 1.97.0 | Local wheel installation, official NA assembly and offline callback/cleanup tests |
-| Linux x86_64, glibc 2.34+, CPython 3.13 | Optimized 0.2.1a2 Release, Rust 1.97.0, manylinux 2.34 audit | 2026-11-10 offline clean standalone/TL/base installation qualified; live deployment pending |
+| Linux x86_64, glibc 2.34+, CPython 3.13 | Optimized 0.2.1a3 Release, Rust 1.97.0, manylinux 2.34 audit | 2026-11-10 offline clean standalone/TL/base installation qualified; live deployment pending |
 
 The 0.2.1a1 Linux wheel is historical evidence for its own source and cannot
 validate the new credential ABI. Current source, Cargo.lock, toolchain, flags and

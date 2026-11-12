@@ -1,6 +1,6 @@
 import unittest
 from decimal import Decimal
-from lq_adapter_ctrader.execution import project_funds
+from tl_store.ctrader.execution import project_funds
 
 
 class OfficialFunds(unittest.TestCase):

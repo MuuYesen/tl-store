@@ -2,11 +2,11 @@ import asyncio
 from collections import deque
 from types import SimpleNamespace
 import unittest
-from lq_adapter_ctrader.data import CTraderDataClient
-from lq_adapter_ctrader.execution import CTraderExecutionClient
-from lq_adapter_ctrader.errors import FundsRevisionChanged
-from lq_adapter_ctrader.provider import instrument_from_wire
-from lq_adapter_ctrader.session import CTraderAccountObserver
+from tl_store.ctrader.data import CTraderDataClient
+from tl_store.ctrader.execution import CTraderExecutionClient
+from tl_store.ctrader.errors import FundsRevisionChanged
+from tl_store.ctrader.provider import instrument_from_wire
+from tl_store.ctrader.session import CTraderAccountObserver
 
 
 class ReplayEnd(Exception):

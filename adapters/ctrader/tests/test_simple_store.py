@@ -56,7 +56,7 @@ def test_native_and_simple_parameters_cannot_mix():
 
 
 def test_native_explicit_credentials_do_not_read_global_oauth_or_files(tmp_path, monkeypatch):
-    from lq_adapter_ctrader._native import AccountSession
+    from tl_store.ctrader._native import AccountSession
     monkeypatch.setenv('CTRADER_OPENAPI_TOKEN_ROLE', 'invalid-global-value')
     monkeypatch.setenv('CTRADER_OPENAPI_TOKEN_STATE', '/unrelated/private/state')
     # Native construction validates only in-memory bindings, even with hostile globals.

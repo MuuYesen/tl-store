@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "tl-store"
-version = "0.2.1a2"
+version = "0.2.1a3"
 description = "TradeLearn adapter collection with built-in cTrader clients for official NautilusTrader"
 readme = "README.md"
 requires-python = ">=3.13,<3.14"
@@ -26,8 +26,8 @@ Repository = "https://github.com/MuuYesen/TL-Store"
 bindings = "pyo3"
 manifest-path = "adapters/ctrader/native/Cargo.toml"
 python-source = "adapters/ctrader/python"
-python-packages = ["tl_store", "lq_adapter_ctrader"]
-module-name = "lq_adapter_ctrader._native"
+python-packages = ["tl_store"]
+module-name = "tl_store.ctrader._native"
 features = ["extension-module"]
 include = [
     { path = "adapters/ctrader/README.md", format = "sdist" },
@@ -38,4 +38,4 @@ include = [
     { path = ".github/workflows/release.yml", format = "sdist" },
     { path = "LICENSE", format = "sdist" },
 ]
-exclude = ["**/__pycache__/**", "**/*.pyc", "**/*.pyo", "**/target/**"]
+exclude = ["adapters/ctrader/python/lq_adapter_ctrader/**", "**/__pycache__/**", "**/*.pyc", "**/*.pyo", "**/target/**"]

@@ -35,7 +35,7 @@ fn operation(name: &str) -> PyResult<ReadOnlyRequest> {
         _ => return Err(value("Unknown read-only operation")),
     })
 }
-#[pyclass(module = "lq_adapter_ctrader._native")]
+#[pyclass(module = "tl_store.ctrader._native")]
 pub struct AccountSession {
     inner: Arc<OpenApiAccountSession>,
 }
@@ -116,7 +116,7 @@ impl AccountSession {
         })
     }
 }
-#[pyclass(module = "lq_adapter_ctrader._native")]
+#[pyclass(module = "tl_store.ctrader._native")]
 pub struct AccountConnection {
     inner: Arc<Connection>,
 }

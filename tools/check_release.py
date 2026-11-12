@@ -48,7 +48,7 @@ def check_wheel(path):
             data = archive.read(name)
             actual = 'sha256=' + base64.urlsafe_b64encode(hashlib.sha256(data).digest()).rstrip(b'=').decode()
             assert digest == actual and int(size) == len(data), name
-        assert any(n.startswith('lq_adapter_ctrader/_native') and n.endswith('.so') for n in names)
+        assert any(n.startswith('tl_store/ctrader/_native') and n.endswith('.so') for n in names)
         metadata = archive.read(next(n for n in names if n.endswith('.dist-info/METADATA'))).decode()
         assert 'Name: tl-store' in metadata
         assert 'License-Expression: LGPL-3.0-only' in metadata
@@ -62,7 +62,8 @@ def check_wheel(path):
                 body = archive.read(name)
                 assert b'/Users/' not in body and b'.local-backups' not in body, name
         assert any(n.endswith('/licenses/adapters/ctrader/COPYING.LESSER') for n in names)
-        for source in (COMPONENT / 'python').rglob('*.py'):
+        assert not any(n.startswith('lq_adapter_ctrader/') for n in names)
+        for source in (COMPONENT / 'python/tl_store').rglob('*.py'):
             member = str(source.relative_to(COMPONENT / 'python'))
             assert archive.read(member) == source.read_bytes(), member
         for source in (COMPONENT / 'LICENSES').iterdir():

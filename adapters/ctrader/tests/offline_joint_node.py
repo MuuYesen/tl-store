@@ -36,7 +36,7 @@ from nautilus_trader.model import (
     PositionId,
     OrderStatus,
 )
-from lq_adapter_ctrader import (
+from tl_store.ctrader import (
     CTraderConfig,
     VerifiedDealEconomics,
     CTraderDataClientFactory,
@@ -471,7 +471,7 @@ async def main():
 if __name__ == "__main__":
     result = {
         "official_version": "2.0.0rc7",
-        "target_adapter": str(Path(__import__("lq_adapter_ctrader").__file__)),
+        "target_adapter": str(Path(__import__("tl_store.ctrader").__file__)),
         "network": "socket audit denied",
         "transport": "deterministic broker replay; native WS/unknown-result reconciliation tested separately",
         "results": asyncio.run(main()),

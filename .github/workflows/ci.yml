@@ -24,7 +24,7 @@ jobs:
       - name: Check and install
         run: |
           python tools/check_release.py --wheel dist/*.whl
-          python -m pip install --no-deps --no-index --find-links dist 'tl-store==0.2.1a2'
+          python -m pip install --no-deps --no-index --find-links dist 'tl-store==0.2.1a3'
           python -m pip check
           python -m pytest -q adapters/ctrader/tests --ignore=adapters/ctrader/tests/test_store.py
       - uses: actions/upload-artifact@v4
@@ -55,7 +55,7 @@ jobs:
       - name: Check and install
         run: |
           python tools/check_release.py --wheel dist/*.whl
-          python -m pip install --no-deps --no-index --find-links dist 'tl-store==0.2.1a2'
+          python -m pip install --no-deps --no-index --find-links dist 'tl-store==0.2.1a3'
           python -m pip check
           python -m pytest -q adapters/ctrader/tests --ignore=adapters/ctrader/tests/test_store.py
       - uses: actions/upload-artifact@v4

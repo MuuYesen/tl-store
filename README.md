@@ -7,7 +7,7 @@ cTrader distribution. Adapter implementations remain separated under `adapters/`
 future adapters and dependencies will be selected explicitly, not all installed
 by default.
 
-The current source is an **unpublished alpha candidate 0.2.1a2** for the
+The current source is an **unpublished alpha candidate 0.2.1a3** for the
 Backtrader interface. Its new native-credential ABI requires matching rebuilt wheels;
 0.2.1a1 artifacts remain historical evidence for their own source. Optimized compilation does not turn the alpha or its official NA release
 candidate dependency into stable software. GitHub source, Release and PyPI
@@ -47,7 +47,7 @@ not update the old PyPI release. This combination is qualified only for CPython
 Before publication, use the local wheelhouse:
 
 ```sh
-pip install --no-index --find-links ./wheelhouse "tl-store==0.2.1a2"
+pip install --no-index --find-links ./wheelhouse "tl-store==0.2.1a3"
 ```
 
 After this exact alpha version is published, omit

@@ -5,8 +5,8 @@ import pytest
 from nautilus_trader.live import LiveNodeConfig
 from nautilus_trader.config import DataClientConfig, ExecutionClientConfig
 from nautilus_trader.model import TraderId
-from lq_adapter_ctrader import CTraderConfig
-from lq_adapter_ctrader.store import CTraderStoreConfig, build_adapter
+from tl_store.ctrader import CTraderConfig
+from tl_store.ctrader.store import CTraderStoreConfig, build_adapter
 from tradelearn_runtime.store import NautilusStore
 
 def assembled(config):
@@ -20,7 +20,7 @@ def config(path, login=100001):
         state_dir=path)
 
 def test_constructs_isolated_without_acquire_or_state_writes(tmp_path, monkeypatch):
-    from lq_adapter_ctrader.session import CTraderAccountSession
+    from tl_store.ctrader.session import CTraderAccountSession
     async def forbidden(*args, **kwargs):raise AssertionError('connected during assembly')
     monkeypatch.setattr(CTraderAccountSession,'acquire',forbidden)
     a,b=assembled(config(tmp_path)),assembled(config(tmp_path,100002))
@@ -48,7 +48,7 @@ def test_rejects_wrong_config_and_unknown_parameters(tmp_path):
         replace(config(tmp_path),node_config=LiveNodeConfig(trader_id=TraderId('CLIENT-001')))
 
 def test_real_official_node_assembles_installed_factories_offline(tmp_path,monkeypatch):
-    from lq_adapter_ctrader.session import CTraderAccountSession
+    from tl_store.ctrader.session import CTraderAccountSession
     async def forbidden(*args,**kwargs):raise AssertionError('broker access')
     monkeypatch.setattr(CTraderAccountSession,'acquire',forbidden)
     store=assembled(config(tmp_path));node=store._build_node()

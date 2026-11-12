@@ -1,7 +1,7 @@
 import unittest
 from decimal import Decimal
-from lq_adapter_ctrader.config import CTraderConfig
-from lq_adapter_ctrader.provider import instrument_from_wire
+from tl_store.ctrader.config import CTraderConfig
+from tl_store.ctrader.provider import instrument_from_wire
 
 
 class Contracts(unittest.TestCase):

@@ -1,7 +1,7 @@
 """AccountState.info is raw framework data; transport encoding belongs to logs."""
 import unittest
 from types import SimpleNamespace
-from lq_adapter_ctrader.execution import CTraderExecutionClient
+from tl_store.ctrader.execution import CTraderExecutionClient
 
 class StandardAccountInfo(unittest.IsolatedAsyncioTestCase):
     async def test_large_original_facts_are_published_without_private_carrier(self):
