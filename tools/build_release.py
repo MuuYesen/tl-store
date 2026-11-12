@@ -13,6 +13,18 @@ import sys
 
 ROOT = Path(__file__).resolve().parents[1]
 
+def validate_native_target(system, machine, python_version):
+    """Qualified build-only targets; runtime acceptance is recorded separately."""
+    allowed = {
+        ('Darwin', 'arm64'), ('Windows', 'amd64'), ('Windows', 'x86_64'),
+        ('Linux', 'x86_64'), ('Linux', 'aarch64'), ('Linux', 'arm64'),
+    }
+    if (system, machine.lower()) not in allowed:
+        raise SystemExit('Unqualified native OS/architecture target')
+    if tuple(python_version) not in ((3, 13), (3, 14)):
+        raise SystemExit('CPython 3.13 or 3.14 target required')
+
+
 def cross_environment(args):
     if not args.target:
         if args.target_python_abi or args.target_python_dir:
@@ -70,8 +82,6 @@ def main():
     args = parser.parse_args()
     cross_env = cross_environment(args)
     interpreter = ('python3.13' if args.target else (args.interpreter or sys.executable))
-    if (platform.system(), platform.machine()) not in [('Darwin', 'arm64'), ('Linux', 'x86_64')]:
-        raise SystemExit('Only qualified macOS arm64 / Linux x86_64 builders are supported')
     if version('maturin') != '1.13.1':
         raise SystemExit('maturin 1.13.1 required')
     maturin = shutil.which('maturin')
@@ -82,8 +92,10 @@ def main():
     compiler = subprocess.check_output(['rustc', '--version'], text=True).strip()
     if not compiler.startswith('rustc 1.97.0 '):
         raise SystemExit('Rust 1.97.0 required')
-    if not args.target and subprocess.check_output([interpreter, '-c', 'import sys; print(sys.version_info[:2] == (3, 13))'], text=True).strip() != 'True':
-        raise SystemExit('CPython 3.13 target required')
+    if not args.target:
+        python_version = json.loads(subprocess.check_output(
+            [interpreter, '-c', 'import json,sys; print(json.dumps(list(sys.version_info[:2])))'], text=True))
+        validate_native_target(platform.system(), platform.machine(), python_version)
     if os.environ.get('RUSTFLAGS') or os.environ.get('CARGO_ENCODED_RUSTFLAGS'):
         raise SystemExit('Clear external Rust flags before a qualified release build')
     component = args.component.resolve()

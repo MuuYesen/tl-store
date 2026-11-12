@@ -1,6 +1,6 @@
 [package]
 name = "tl-store-ctrader-native"
-version = "0.2.1"
+version = "0.2.1-alpha.4"
 edition = "2024"
 license = "LGPL-3.0-only"
 repository = "https://github.com/MuuYesen/TL-Store"
@@ -42,3 +42,6 @@ incremental = false
 opt-level = 3
 debug = 0
 incremental = false
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "=0.61.2", features = ["Win32_Foundation", "Win32_Security", "Win32_Security_Authorization", "Win32_Storage_FileSystem", "Win32_System_Threading", "Win32_System_Performance"] }

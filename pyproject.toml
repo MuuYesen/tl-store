@@ -4,14 +4,14 @@ build-backend = "maturin"
 
 [project]
 name = "tl-store"
-version = "0.2.1a3"
+version = "0.2.1a4"
 description = "TradeLearn adapter collection with built-in cTrader clients for official NautilusTrader"
 readme = "README.md"
-requires-python = ">=3.13,<3.14"
+requires-python = ">=3.13,<3.15"
 license = "LGPL-3.0-only"
 license-files = ["adapters/ctrader/COPYING", "adapters/ctrader/COPYING.LESSER", "adapters/ctrader/NOTICE", "adapters/ctrader/LICENSES/*"]
 dependencies = ["nautilus_trader==2.0.0rc7"]
-classifiers = ["Development Status :: 3 - Alpha", "Programming Language :: Python :: 3.13", "Programming Language :: Rust"]
+classifiers = ["Development Status :: 3 - Alpha", "Programming Language :: Python :: 3.13", "Programming Language :: Python :: 3.14", "Programming Language :: Rust"]
 
 [project.optional-dependencies]
 test = ["pytest>=9,<10"]

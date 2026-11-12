@@ -25,10 +25,10 @@ def normalize(value):
 
 
 ROOT = Path(__file__).resolve().parents[1]
-KIT = "tl_store-0.2.1a3.dist-info/corresponding-source/"
+KIT = "tl_store-0.2.1a4.dist-info/corresponding-source/"
 CONFIG = b'[source.crates-io]\nreplace-with = "vendored-sources"\n[source.vendored-sources]\ndirectory = "vendor"\n'
-REBUILD = b"""Recipient source for tl-store 0.2.1a3; private Git access is unnecessary.
-Use CPython3.13, Rust1.97.0, maturin1.13.1 and the ordinary platform compiler.
+REBUILD = b"""Recipient source for tl-store 0.2.1a4; private Git access is unnecessary.
+Use matching CPython3.13 or3.14, Rust1.97.0, maturin1.13.1 and the ordinary platform compiler.
 From an unpacked wheel, run this supplied script:
   python tools/finalize_wheel.py --extract-corresponding-source /path/to/wheel --destination /new/source
 Then cd /new/source and build without any registry/network access:
@@ -43,9 +43,17 @@ def digest(data):
     return hashlib.sha256(data).hexdigest()
 
 
+def archive_name(path, root):
+    relative = path.relative_to(root)
+    if relative.is_absolute() or '..' in relative.parts:
+        raise ValueError('source archive path escapes root')
+    return relative.as_posix()
+
+
 def component_source(root):
     root = Path(root)
     names = [
+        ".gitattributes",
         "LICENSE",
         "README.md",
         "pyproject.toml",
@@ -63,7 +71,7 @@ def component_source(root):
         ("adapters/ctrader/LICENSES", "*"),
     ]:
         names.extend(
-            str(p.relative_to(root))
+            archive_name(p, root)
             for p in (root / folder).rglob(pattern)
             if p.is_file()
         )
@@ -107,7 +115,7 @@ def vendor_source(directory, lock):
             if check["package"] != checksum:
                 raise ValueError("vendor package checksum differs")
             files = {
-                str(p.relative_to(crate)): p
+                archive_name(p, crate): p
                 for p in crate.rglob("*")
                 if p.is_file() or p.is_symlink()
             }
@@ -139,7 +147,7 @@ def corresponding_source(dist_info, source, vendor):
     manifest = {
         "schema": 1,
         "project": "tl-store",
-        "version": "0.2.1a3",
+        "version": "0.2.1a4",
         "files": {n: digest(b) for n, b in source.items()},
         "vendor_sha256": digest(body),
         "locked_packages": packages,
@@ -157,11 +165,11 @@ def verify_corresponding_source(members, root=None):
     if (manifest.get("schema"), manifest.get("project"), manifest.get("version")) != (
         1,
         "tl-store",
-        "0.2.1a3",
+        "0.2.1a4",
     ):
         raise ValueError("recipient source identity differs")
     sources = manifest["files"]
-    if len(sources) != 481:
+    if len(sources) != 483:
         raise ValueError("recipient component source closure differs")
     expected = {KIT + n for n in sources} | {
         KIT + n
@@ -269,7 +277,7 @@ def finalize(source, destination, vendor_dir):
     native_before = {
         n: hashlib.sha256(b).hexdigest()
         for n, b in members.items()
-        if n.endswith(".so")
+        if n.endswith((".so", ".pyd"))
     }
     for name, body in members.items():
         if name.endswith(".cyclonedx.json"):

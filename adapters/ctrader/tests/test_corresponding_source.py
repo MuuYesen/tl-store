@@ -63,7 +63,7 @@ def test_vendor_rejects_incomplete_or_unreviewed_files(tmp_path, fault):
 
 def test_approved_component_source_scope_excludes_tests_history_and_old_alias():
     files = pack.component_source(ROOT)
-    assert len(files) == 481
+    assert len(files) == 483
     assert "adapters/ctrader/native/src/lib.rs" in files
     assert all(".git/" not in n and not n.startswith(".github/") for n in files)
     assert not any("/tests/" in n or "lq_adapter_ctrader" in n for n in files)
@@ -73,8 +73,8 @@ def test_recipient_source_manifest_rejects_missing_or_modified_source(tmp_path):
     directory, lock = vendor(tmp_path)
     source = pack.component_source(ROOT)
     source["adapters/ctrader/native/Cargo.lock"] = lock
-    members = pack.corresponding_source("tl_store-0.2.1a3.dist-info", source, directory)
-    assert pack.verify_corresponding_source(members)["source_files"] == 481
+    members = pack.corresponding_source("tl_store-0.2.1a4.dist-info", source, directory)
+    assert pack.verify_corresponding_source(members)["source_files"] == 483
     key = next(n for n in members if n.endswith("/native/src/lib.rs"))
     members[key] += b"\nmodified"
     with pytest.raises(ValueError, match="source digest"):
@@ -132,13 +132,13 @@ def test_recipient_extracts_approved_source_and_executable_vendor_without_git(tm
     (directory / "fixture-1.0.0/lib.rs").chmod(0o755)
     source = pack.component_source(ROOT)
     source["adapters/ctrader/native/Cargo.lock"] = lock
-    members = pack.corresponding_source("tl_store-0.2.1a3.dist-info", source, directory)
+    members = pack.corresponding_source("tl_store-0.2.1a4.dist-info", source, directory)
     wheel = tmp_path / "recipient.whl"
     with ZipFile(wheel, "w") as archive:
         for name, body in members.items():
             archive.writestr(name, body)
     output = tmp_path / "extracted"
-    assert pack.extract_source(wheel, output)["source_files"] == 481
+    assert pack.extract_source(wheel, output)["source_files"] == 483
     assert not (output / ".git").exists()
     assert (output / "adapters/ctrader/native/src/lib.rs").read_bytes() == source[
         "adapters/ctrader/native/src/lib.rs"
@@ -147,3 +147,12 @@ def test_recipient_extracts_approved_source_and_executable_vendor_without_git(tm
     members[pack.KIT + "extra.env"] = b"unreviewed"
     with pytest.raises(ValueError, match="member set"):
         pack.verify_corresponding_source(members)
+
+
+@pytest.mark.parametrize('windows',[False,True])
+def test_archive_paths_are_portable_and_cannot_escape_source_root(windows):
+    from pathlib import PureWindowsPath,PurePosixPath
+    path=PureWindowsPath if windows else PurePosixPath
+    root=path('C:/source' if windows else '/source')
+    assert pack.archive_name(root/'nested'/'source.rs',root)=='nested/source.rs'
+    with pytest.raises(ValueError):pack.archive_name(root/'..'/'outside.rs',root)

@@ -9,3 +9,6 @@ mod python;
 
 #[cfg(any(feature = "python", test))]
 mod owned_operation;
+
+#[cfg(windows)]
+mod windows_private;

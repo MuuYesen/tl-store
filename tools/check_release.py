@@ -9,7 +9,7 @@ import json
 from pathlib import Path
 from zipfile import ZipFile
 
-from finalize_wheel import KIT, verify_corresponding_source
+from finalize_wheel import KIT, archive_name, verify_corresponding_source
 
 ROOT = Path(__file__).resolve().parents[1]
 COMPONENT = ROOT / "adapters/ctrader"
@@ -60,7 +60,7 @@ def check_wheel(path):
             )
             assert digest == actual and int(size) == len(data), name
         assert any(
-            n.startswith("tl_store/ctrader/_native") and n.endswith(".so")
+            n.startswith("tl_store/ctrader/_native") and n.endswith((".so", ".pyd"))
             for n in names
         )
         metadata = archive.read(
@@ -83,15 +83,15 @@ def check_wheel(path):
                     name
                 )
         for name in names:
-            if name.endswith(".so"):
+            if name.endswith((".so", ".pyd")):
                 body = archive.read(name)
-                assert b"/Users/" not in body and b".local-backups" not in body, name
+                assert all(marker not in body for marker in (b"/Users/", b"\\Users\\", b".local-backups")), name
         assert any(
             n.endswith("/licenses/adapters/ctrader/COPYING.LESSER") for n in names
         )
         assert not any(n.startswith("lq_adapter_ctrader/") for n in names)
         for source in (COMPONENT / "python/tl_store").rglob("*.py"):
-            member = str(source.relative_to(COMPONENT / "python"))
+            member = archive_name(source, COMPONENT / "python")
             assert archive.read(member) == source.read_bytes(), member
         for source in (COMPONENT / "LICENSES").iterdir():
             matches = [

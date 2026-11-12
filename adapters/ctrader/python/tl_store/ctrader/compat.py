@@ -3,8 +3,8 @@ from importlib.metadata import PackageNotFoundError, version
 import sys
 
 def require_official_nautilus():
-    if sys.implementation.name != 'cpython' or sys.version_info[:2] != (3, 13):
-        raise RuntimeError('This adapter candidate requires CPython 3.13')
+    if sys.implementation.name != 'cpython' or sys.version_info[:2] not in ((3, 13), (3, 14)):
+        raise RuntimeError('This adapter candidate requires CPython 3.13 or3.14')
     try:
         actual = version('nautilus_trader')
     except PackageNotFoundError:

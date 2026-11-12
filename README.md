@@ -1,3 +1,5 @@
+> Current source candidate: **0.2.1a4, unpublished/unqualified**. Adds real Mac arm64, Windows AMD64, Linux x64/ARM64 build targets for CPython3.13/3.14. Windows/ARM results will be build-only unless explicitly recorded; do not infer runtime support from tags. Public **0.2.1a3** remains the immutable qualified CP313 Mac/Linuxx64 release. Current IC uses TL0.3.0+Storea3; a4 preparation does not replace its frozen artifacts.
+
 # TL-Store
 
 `tl-store` is the Python distribution for the TL-Store adapter collection.

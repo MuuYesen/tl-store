@@ -1641,7 +1641,7 @@ checksum = "fd3ca314f692efd6c868f8408f53fe444634a845f96c028b97d35f6a1f79f0ee"
 
 [[package]]
 name = "tl-store-ctrader-native"
-version = "0.2.1"
+version = "0.2.1-alpha.4"
 dependencies = [
  "anyhow",
  "futures-util",
@@ -1661,6 +1661,7 @@ dependencies = [
  "tokio-tungstenite",
  "uuid",
  "webpki-roots 1.0.11",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]

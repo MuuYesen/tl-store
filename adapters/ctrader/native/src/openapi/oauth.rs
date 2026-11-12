@@ -273,9 +273,9 @@ impl OAuthTokenStore {
         );
         Ok(())
     }
-    #[cfg(not(unix))]
-    fn check_directory(&self, _create: bool) -> Result<()> {
-        bail!("Managed OAuth requires Unix private-file semantics")
+    #[cfg(windows)]
+    fn check_directory(&self, create: bool) -> Result<()> {
+        crate::windows_private::check_directory(self.parent()?, create)
     }
     #[cfg(unix)]
     fn open_private(&self, path: &std::path::Path, create: bool) -> Result<File> {
@@ -302,9 +302,9 @@ impl OAuthTokenStore {
         );
         Ok(file)
     }
-    #[cfg(not(unix))]
-    fn open_private(&self, _path: &std::path::Path, _create: bool) -> Result<File> {
-        bail!("Managed OAuth requires Unix private-file semantics")
+    #[cfg(windows)]
+    fn open_private(&self, path: &std::path::Path, create: bool) -> Result<File> {
+        crate::windows_private::open_file(path, create, false)
     }
     fn lock_owner(&self) -> Result<File> {
         self.check_directory(false)?;
@@ -427,22 +427,28 @@ impl OAuthTokenStore {
             TEMP_SEQUENCE.fetch_add(1, Ordering::Relaxed)
         ));
         let result = (|| -> Result<()> {
-            let mut options = OpenOptions::new();
-            options.write(true).create_new(true);
             #[cfg(unix)]
-            options.mode(0o600).custom_flags(libc::O_NOFOLLOW);
-            let mut file = options
-                .open(&path)
+            let mut file = {
+                let mut options = OpenOptions::new();
+                options.write(true).create_new(true).mode(0o600).custom_flags(libc::O_NOFOLLOW);
+                options.open(&path)
+            }
                 .map_err(|_| anyhow::anyhow!("Cannot create OAuth commit file"))?;
+            #[cfg(windows)]
+            let mut file = crate::windows_private::open_file(&path, true, true)?;
             file.write_all(&bytes)
                 .map_err(|_| anyhow::anyhow!("Cannot write OAuth commit file"))?;
             file.sync_all()
                 .map_err(|_| anyhow::anyhow!("Cannot sync OAuth commit file"))?;
-            fs::rename(&path, &self.config.state_path)
-                .map_err(|_| anyhow::anyhow!("Cannot atomically commit OAuth state"))?;
-            File::open(self.parent()?)
-                .and_then(|dir| dir.sync_all())
-                .map_err(|_| anyhow::anyhow!("Cannot sync OAuth directory"))?;
+            #[cfg(unix)]
+            {
+                fs::rename(&path, &self.config.state_path)
+                    .map_err(|_| anyhow::anyhow!("Cannot atomically commit OAuth state"))?;
+                File::open(self.parent()?).and_then(|dir| dir.sync_all())
+                    .map_err(|_| anyhow::anyhow!("Cannot sync OAuth directory"))?;
+            }
+            #[cfg(windows)]
+            crate::windows_private::commit(&path, &self.config.state_path)?;
             Ok(())
         })();
         if result.is_err() {

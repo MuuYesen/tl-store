@@ -38,21 +38,26 @@ jobs:
           python tools/check_release.py --qualified-run qualified-run.json --sha "$GITHUB_SHA"
       - uses: actions/download-artifact@v4
         with:
-          pattern: ctrader-cp313-*-release
+          pattern: ctrader-*-release
           path: incoming
           github-token: ${{ github.token }}
           run-id: ${{ inputs.qualified_run_id }}
-      - name: Select exact two platform wheels; keep standalone source artifacts private
+      - name: Select exact eight platform/ABI wheels; keep standalone source artifacts private
         run: |
           python - <<'PY'
           from pathlib import Path
           import shutil
           wheels = sorted(Path('incoming').rglob('*.whl'))
-          assert len(wheels) == 2, wheels
-          assert len({p.name for p in wheels}) == 2
+          assert len(wheels) == 8, wheels
+          assert len({p.name for p in wheels}) == 8
+          targets={tuple(p.name[:-4].rsplit('-',3)[1:]) for p in wheels}
+          assert len(targets)==8, 'duplicate or missing OS/ABI target'
           Path('dist').mkdir()
           for path in wheels:
-              assert path.name.startswith('tl_store-0.2.1a3-cp313-cp313-'), path
+              assert path.name.startswith('tl_store-0.2.1a4-'), path
+              _, py, abi, platform = path.name[:-4].rsplit('-',3)
+              assert py == abi and py in {'cp313','cp314'}, path
+              assert platform in {'macosx_11_0_arm64','win_amd64','manylinux_2_34_x86_64','manylinux_2_34_aarch64'}, path
               shutil.copy2(path, Path('dist') / path.name)
           PY
       - name: Require exact recipient corresponding source, vendor and RECORD
