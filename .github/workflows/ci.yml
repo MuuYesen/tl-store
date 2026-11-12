@@ -24,6 +24,7 @@ jobs:
           - {os: windows-latest, slug: windows-amd64, python: '3.14', runtime: false, rebuild: false}
     env:
       CARGO_BUILD_JOBS: '2'
+      CARGO_HOME: ${{ runner.temp }}/cargo
       PYTHONUTF8: '1'
       MACOSX_DEPLOYMENT_TARGET: '11.0'
     steps:
@@ -52,7 +53,7 @@ jobs:
         env:
           ARM_IMAGE: ${{ matrix.image }}
         run: |
-          docker run --rm -i --platform linux/arm64 --mount "type=bind,src=$GITHUB_WORKSPACE,dst=/source" -w /source -e CARGO_BUILD_JOBS=2 -e PYTHONUTF8=1 -e TL_BUILD_IMAGE="$ARM_IMAGE" "$ARM_IMAGE" sh -s <<'BUILD'
+          docker run --rm -i --platform linux/arm64 --mount "type=bind,src=$GITHUB_WORKSPACE,dst=/source" -w /source -e CARGO_BUILD_JOBS=2 -e PYTHONUTF8=1 -e TL_HOST_UID="$(id -u)" -e TL_HOST_GID="$(id -g)" -e TL_BUILD_IMAGE="$ARM_IMAGE" "$ARM_IMAGE" sh -s <<'BUILD'
           set -eu
           apt-get update
           apt-get install -y --no-install-recommends build-essential cmake curl pkg-config ca-certificates git
@@ -72,6 +73,7 @@ jobs:
           record={'image':os.environ['TL_BUILD_IMAGE'],'OS':platform.system(),'machine':platform.machine(),'python':sys.version,'rustc':subprocess.check_output(['rustc','--version'],text=True).strip()}
           Path('dist/native-build-environment.json').write_text(json.dumps(record,indent=2)+'\n',encoding='utf-8')
           PY
+          chown -R "$TL_HOST_UID:$TL_HOST_GID" dist raw-dist
           BUILD
       - name: Focused installed runtime; other targets remain build-only
         id: runtime
@@ -120,6 +122,13 @@ jobs:
           Path('dist/platform-qualification.json').write_text(json.dumps(receipt,indent=2)+'\n')
           print(json.dumps(receipt))
           PY
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: diagnostic-${{ matrix.python }}-${{ matrix.slug }}
+          path: raw-dist/*.whl
+          if-no-files-found: ignore
+          retention-days: 3
       - uses: actions/upload-artifact@v4
         with:
           name: ctrader-${{ matrix.python }}-${{ matrix.slug }}-release

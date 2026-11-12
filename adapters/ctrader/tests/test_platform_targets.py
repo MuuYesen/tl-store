@@ -37,3 +37,22 @@ def test_runtime_python_guard_matches_official_na_abi_range(minor,accepted,monke
         if accepted:compat.require_official_nautilus()
         else:
             with pytest.raises(RuntimeError,match='CPython'):compat.require_official_nautilus()
+
+
+@pytest.mark.parametrize('marker',[
+    b'/' + b'Users' + b'/fixture/source.c',
+    bytes([92]) + b'Users' + bytes([92]) + b'fixture' + bytes([92]) + b'source.c',
+    b'.local-backups' + b'/fixture/source.c',
+])
+def test_native_private_build_paths_are_rejected_without_exposing_the_path(marker,monkeypatch):
+    monkeypatch.syspath_prepend(str(ROOT/'tools'))
+    import check_release
+    with pytest.raises(ValueError,match='fingerprint') as error:
+        check_release.check_native_privacy(b'header\0'+marker+b'\0binary')
+    assert 'fixture' not in str(error.value)
+
+
+def test_neutral_build_paths_remain_valid(monkeypatch):
+    monkeypatch.syspath_prepend(str(ROOT/'tools'))
+    import check_release
+    assert check_release.check_native_privacy(b'PE\0/build/vendor/crypto/source.c\0') is None

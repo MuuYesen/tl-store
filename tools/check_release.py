@@ -39,6 +39,20 @@ def check_source():
     return count, len(inventory["packages"])
 
 
+def check_native_privacy(body):
+    """Reject private build roots; diagnostics disclose only class and fingerprint."""
+    markers = (b"/Users/", bytes([92]) + b"Users" + bytes([92]), b".local-backups")
+    for marker in markers:
+        offset = body.find(marker)
+        if offset < 0:
+            continue
+        context = body[offset:offset + 512].split(b"\0", 1)[0]
+        category = ("cargo-registry" if b".cargo" in context or b"registry" in context
+                    else "rust-toolchain" if b".rustup" in context else "private-build-root")
+        raise ValueError("native private build path category=" + category
+                         + "; fingerprint=" + hashlib.sha256(context).hexdigest())
+
+
 def check_wheel(path):
     with ZipFile(path) as archive:
         names = archive.namelist()
@@ -85,7 +99,7 @@ def check_wheel(path):
         for name in names:
             if name.endswith((".so", ".pyd")):
                 body = archive.read(name)
-                assert all(marker not in body for marker in (b"/Users/", b"\\Users\\", b".local-backups")), name
+                check_native_privacy(body)
         assert any(
             n.endswith("/licenses/adapters/ctrader/COPYING.LESSER") for n in names
         )
