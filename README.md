@@ -1,5 +1,3 @@
-> Current source candidate: **0.2.1a4, unpublished/unqualified**. Adds real Mac arm64, Windows AMD64, Linux x64/ARM64 build targets for CPython3.13/3.14. Windows/ARM results will be build-only unless explicitly recorded; do not infer runtime support from tags. Public **0.2.1a3** remains the immutable qualified CP313 Mac/Linuxx64 release. Current IC uses TL0.3.0+Storea3; a4 preparation does not replace its frozen artifacts.
-
 # TL-Store
 
 `tl-store` is the Python distribution for the TL-Store adapter collection.
@@ -9,11 +7,18 @@ cTrader distribution. Adapter implementations remain separated under `adapters/`
 future adapters and dependencies will be selected explicitly, not all installed
 by default.
 
-The current source is an **unpublished alpha candidate 0.2.1a3** for the
-Backtrader interface. Its new native-credential ABI requires matching rebuilt wheels;
-0.2.1a1 artifacts remain historical evidence for their own source. Optimized compilation does not turn the alpha or its official NA release
-candidate dependency into stable software. GitHub source, Release and PyPI
-publication are separate actions and are not asserted here.
+**0.2.1a4 is published on public PyPI** from private source revision
+`6939669c683afb6c3500efc8686609a1e6201f8f`. Eight real native wheels cover
+CPython 3.13/3.14 on macOS arm64, Windows AMD64, Linux x86_64 and Linux aarch64
+(glibc 2.34+). Mac/Linux x86_64 passed installed offline tests; their CP313 jobs
+also rebuilt recipient source offline with an empty Cargo home. Windows and
+Linux aarch64 are **build-only, not runtime-tested**. Alpha status and the fixed
+official NA release-candidate dependency remain explicit.
+
+The GitHub repository and history remain private. Each public wheel supplies
+483 necessary source/license/build files and all 233 locked vendor crates under
+`.dist-info/corresponding-source`; private Git access is unnecessary to rebuild.
+There is no public standalone Store sdist or private-history attachment.
 
 ## Install through TradeLearn
 
@@ -28,36 +33,25 @@ Users do not specify an adapter package or its version separately. Dependencies
 are one-way: TL's optional group selects TL-Store, which depends on official
 `nautilus_trader==2.0.0rc7`. TL-Store does not depend on TL or commercial monitoring.
 
-This is a publication target. Public trade-learn 0.2.9 has neither unified Store adapter API 2 nor
-the new extra. It is **not currently a verified public PyPI installation**. Before
-publication, install the matching local TL candidate and dependencies from the
-prepared wheelhouse with the exact same requirement:
-
-```sh
-pip install --no-index --find-links ./wheelhouse "trade-learn[nautilus,tl-store]"
-python -m pip check
-```
-
-After compatible TL and TL-Store versions have actually been published and
-verified, the target command becomes the public installation command. TL's next
-release version is owned by its release process; changing source metadata does
-not update the old PyPI release. This combination is qualified only for CPython
-3.13 on macOS arm64 or Linux x86_64 with glibc 2.34+.
+Published TradeLearn **0.3.0** selects immutable Store **0.2.1a3** and has a
+qualified CP313 Mac arm64/Linux x86_64 combination. Its exact wheels and SDK
+freeze remain valid for current IC consumers. New TradeLearn **0.3.1 is still an
+unreleased candidate**: it selects a4 across the eight OS/ABI targets and must
+complete its own formal release gates. Installing a4 alone does not replace
+that TL dependency lock or certify new TL functionality.
 
 ## Install for standalone official NA
 
-Before publication, use the local wheelhouse:
-
 ```sh
-pip install --no-index --find-links ./wheelhouse "tl-store==0.2.1a3"
+python -m pip install "tl-store==0.2.1a4"
+python -m pip check
 ```
 
-After this exact alpha version is published, omit
-`--no-index --find-links ./wheelhouse`. Import the cTrader API with
-`from tl_store import ctrader`. This installs the official NA dependency without
-TL, monitoring, platform tokens or commercial service enrollment. Only the optional
-TL Store binding needs a separately qualified TL unified Store adapter API 2 / Backtrader interface 1 build; older builds
-are rejected explicitly.
+Import with `from tl_store import ctrader`; native lives at
+`tl_store.ctrader._native`, with no old `lq_adapter_ctrader` alias. Standalone
+Store installs official NA without TL, commercial monitoring, account tokens
+or service enrollment. Only optional TL binding requires a qualified matching
+unified Store API2/Backtrader interface1 framework.
 
 See the [cTrader capability and configuration notes](adapters/ctrader/README.md).
 General TL strategy examples use official NautilusStore adapters. TL owns Cerebro,
