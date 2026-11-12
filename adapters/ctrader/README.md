@@ -184,3 +184,38 @@ local workspace paths. This option does not change dependency selection or ABI.
 For cross preparation, expose an existing host CPython 3.13 as `python3.13` on the
 task PATH; maturin executes it to parse the exported target sysconfigdata. Linux
 ABI values still come exclusively from the verified target file.
+
+
+## Read-only capture seam (0.2.1a5)
+
+A data-only integration can use the real `CTraderDataClientFactory(options)` and
+retain `await factory.session.acquire(execution=False)`. No execution client,
+trading engine or execution journal is required. Keep its native event reader
+healthy and release the retained lease normally; do not acquire a fresh lease
+for each sample. Existing explicit OAuth owner/follower selection, refresh lock,
+atomic token state and account binding remain unchanged.
+
+`await transport.state()` returns native `session_id`, `epoch`, `revision`,
+`mono_ns`, and `utc_ns`. The opaque identity is stable for this retained connection;
+a new connection has a new identity. The clocks are the native local observation
+point, never broker event time. Epoch/revision health is fenced before and after
+sampling; dead connections fail and never reconnect inside this call. Python
+must not synthesize or replace these fields.
+
+`await transport.request("orders", {"fromTimestamp": start_ms, "toTimestamp": end_ms})`
+and the same call with `"deals"` return an original broker page, retaining
+`hasMore`. Timestamps must be nonnegative integers with start <= end and
+end <= 2147483646000. Each page is bounded by the lease's explicit
+`max_history_records`; excessive rows or missing/nonboolean completeness markers
+fail. A page is not a complete historical interval: the existing consumer must
+keep its bounded split/retry and raw-facts validation. The native request types
+remain the existing Orders/Deals Open API messages, not a second protocol.
+All mutation names are absent from this string allowlist, and even direct native
+`mutate` rejects every command on an execution=False connection before journal
+or trading I/O. This seam adds no Engine strategy methods or user glue.
+
+The 0.3.2 TradeLearn extra still selects the unchanged public Store a4; a5 is an
+independent adapter revision until a later TL extra is qualified. Existing IC
+installations need not wait for this read-only change. Public wheel source/license/
+build material delivery stays under `.dist-info/corresponding-source`; no standalone
+source or private-history publication is added.

@@ -54,7 +54,7 @@ jobs:
           assert len(targets)==8, 'duplicate or missing OS/ABI target'
           Path('dist').mkdir()
           for path in wheels:
-              assert path.name.startswith('tl_store-0.2.1a4-'), path
+              assert path.name.startswith('tl_store-0.2.1a5-'), path
               _, py, abi, platform = path.name[:-4].rsplit('-',3)
               assert py == abi and py in {'cp313','cp314'}, path
               assert platform in {'macosx_11_0_arm64','win_amd64','manylinux_2_34_x86_64','manylinux_2_34_aarch64'}, path

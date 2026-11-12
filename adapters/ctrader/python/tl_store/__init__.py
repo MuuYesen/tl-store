@@ -1,2 +1,2 @@
 """TL-Store adapter collection. Import an adapter explicitly; no connection on import."""
-__version__ = "0.2.1a4"
+__version__ = "0.2.1a5"

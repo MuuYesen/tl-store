@@ -20,6 +20,20 @@ The GitHub repository and history remain private. Each public wheel supplies
 `.dist-info/corresponding-source`; private Git access is unnecessary to rebuild.
 There is no public standalone Store sdist or private-history attachment.
 
+## Read-only capture interface
+
+0.2.1a5 adds a native observation-point `state()` and bounded Orders/Deals pages
+on the existing retained read-only session. Integrations use the real data-client
+factory/session; no execution client, trading engine or execution journal is
+required. See [the adapter interface](adapters/ctrader/README.md#read-only-capture-seam-021a5)
+for native clock provenance, bounds, failure and lease ownership.
+
+TradeLearn0.3.2 still pins the unchanged a4 adapter. The a5 adapter revision is
+independent for data-only consumers until a later TL extra is qualified; this
+change does not require an IC installation upgrade or new Engine strategy API.
+The a4 publication and runtime evidence above remains historical a4 evidence,
+not proof of new a5 bytes. New wheels require their own exact-SHA CI/receipts.
+
 ## Install through TradeLearn
 
 The recommended target command is:

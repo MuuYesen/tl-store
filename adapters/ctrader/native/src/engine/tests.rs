@@ -26,6 +26,7 @@ struct Broker {
     operations: Vec<u64>,
     spots_before_execution: bool,
     orders: Vec<Value>,
+    history_marker: Option<Value>,
     deals: Vec<Value>,
     writes: usize,
     lose_reply: bool,
@@ -95,11 +96,11 @@ async fn peer(state: Arc<AsyncMutex<Broker>>) -> (String, tokio::task::JoinHandl
                         2112 => (2113, json!({"ctidTraderAccountId":"42","asset":assets()})),
                         2175 => (
                             2176,
-                            json!({"ctidTraderAccountId":"42","hasMore":false,"order":state.orders}),
+                            json!({"ctidTraderAccountId":"42","hasMore":state.history_marker.clone().unwrap_or(json!(false)),"order":state.orders}),
                         ),
                         2133 => (
                             2134,
-                            json!({"ctidTraderAccountId":"42","hasMore":false,"deal":state.deals}),
+                            json!({"ctidTraderAccountId":"42","hasMore":state.history_marker.clone().unwrap_or(json!(false)),"deal":state.deals}),
                         ),
                         2181 => {
                             let id = number(&req["payload"], "orderId").unwrap();
@@ -583,4 +584,58 @@ async fn standard_lost_reply_stays_unknown_and_is_not_replayed() {
     assert_eq!(state.lock().await.writes, 1);
     assert_eq!(std::fs::read_dir(&d.0).unwrap().count(), 0);
     server.abort();
+}
+
+#[tokio::test]
+async fn readonly_state_and_history_keep_native_identity_and_refuse_all_mutations() {
+    let state = Arc::new(AsyncMutex::new(Broker { view_only: true, ..Default::default() }));
+    let (endpoint, server) = peer(state.clone()).await;
+    let config = OpenApiConfig::demo(12345);
+    let session = Arc::new(OpenApiAccountSession::new(config.clone()).unwrap());
+    let lease = session.acquire_connected_at(OpenApiClient::connect_to(
+        &endpoint, config, crate::openapi::tests::mock_credentials()), 0).await.unwrap();
+    let c = Connection::from_lease(lease, false, false, 2).await.unwrap();
+    let before = c.state().await.unwrap();
+    for op in [ReadOnlyRequest::Orders, ReadOnlyRequest::Deals] {
+        let reply = c.request(op, json!({"fromTimestamp":0,"toTimestamp":1})).await.unwrap();
+        assert_eq!(reply["hasMore"], false);
+    }
+    let after = c.state().await.unwrap();
+    for key in ["session_id", "epoch", "revision"] { assert_eq!(before[key], after[key]); }
+    assert!(!before["session_id"].as_str().unwrap().is_empty());
+    assert!(before["epoch"].as_u64().unwrap() > 0);
+    assert!(before["mono_ns"].as_u64().unwrap() > 0);
+    assert!(before["utc_ns"].as_u64().unwrap() > 0);
+    assert!(after["mono_ns"].as_u64().unwrap() >= before["mono_ns"].as_u64().unwrap());
+    assert!(c.requests.is_none() && c.carrier.is_none() && c.metadata_task.is_none());
+    for kind in ["market", "limit", "stop", "cancel", "amend", "close", "unknown"] {
+        assert!(c.mutate(json!({"kind":kind})).await.unwrap_err().to_string().contains("Read-only"));
+    }
+    assert_eq!(state.lock().await.writes, 0);
+    let writes_before = state.lock().await.operations.len();
+    for body in [json!({"fromTimestamp":2,"toTimestamp":1}), json!({"fromTimestamp":-1,"toTimestamp":1}), json!({})] {
+        assert!(c.request(ReadOnlyRequest::Orders, body).await.is_err());
+    }
+    assert_eq!(state.lock().await.operations.len(), writes_before);
+    assert!(c.request(ReadOnlyRequest::Orders, json!({"fromTimestamp":0,"toTimestamp":1,"ctidTraderAccountId":999})).await.is_err());
+    assert_eq!(state.lock().await.operations.len(), writes_before);
+    state.lock().await.orders = vec![json!({}), json!({}), json!({})];
+    assert!(c.request(ReadOnlyRequest::Orders, json!({"fromTimestamp":0,"toTimestamp":1})).await.unwrap_err().to_string().contains("bound"));
+    state.lock().await.history_marker = Some(json!("unknown"));
+    assert!(c.request(ReadOnlyRequest::Deals, json!({"fromTimestamp":0,"toTimestamp":1})).await.unwrap_err().to_string().contains("completeness"));
+    state.lock().await.history_marker = Some(json!(true));
+    assert_eq!(c.request(ReadOnlyRequest::Deals, json!({"fromTimestamp":0,"toTimestamp":1})).await.unwrap()["hasMore"], true);
+    assert!(c.check_epoch(before["epoch"].as_u64().unwrap(), Some(before["revision"].as_u64().unwrap()+1)).await.is_err());
+    c.lease.client().close().await;
+    assert!(c.state().await.is_err());
+    server.abort();
+}
+
+#[test]
+fn readonly_named_operation_allowlist_is_not_a_mutation_protocol() {
+    assert!(matches!(ReadOnlyRequest::named("orders"), Some(ReadOnlyRequest::Orders)));
+    assert!(matches!(ReadOnlyRequest::named("deals"), Some(ReadOnlyRequest::Deals)));
+    for name in ["mutate", "market", "cancel", "amend", "close", "Orders", ""] {
+        assert!(ReadOnlyRequest::named(name).is_none());
+    }
 }

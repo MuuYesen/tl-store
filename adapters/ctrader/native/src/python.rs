@@ -12,28 +12,7 @@ fn value(e: impl std::fmt::Display) -> PyErr {
     PyValueError::new_err(e.to_string())
 }
 fn operation(name: &str) -> PyResult<ReadOnlyRequest> {
-    Ok(match name {
-        "trader" => ReadOnlyRequest::Trader,
-        "reconcile" => ReadOnlyRequest::Reconcile,
-        "assets" => ReadOnlyRequest::Assets,
-        "asset_classes" => ReadOnlyRequest::AssetClasses,
-        "symbol_categories" => ReadOnlyRequest::SymbolCategories,
-        "symbols" => ReadOnlyRequest::Symbols,
-        "symbol_details" => ReadOnlyRequest::SymbolDetails,
-        "position_pnl" => ReadOnlyRequest::PositionPnL,
-        "order_details" => ReadOnlyRequest::OrderDetails,
-        "deals_by_position" => ReadOnlyRequest::DealsByPosition,
-        "orders_by_position" => ReadOnlyRequest::OrdersByPosition,
-        "subscribe_spots" => ReadOnlyRequest::SubscribeSpots,
-        "unsubscribe_spots" => ReadOnlyRequest::UnsubscribeSpots,
-        "subscribe_depth" => ReadOnlyRequest::SubscribeDepthQuotes,
-        "unsubscribe_depth" => ReadOnlyRequest::UnsubscribeDepthQuotes,
-        "trendbars" => ReadOnlyRequest::Trendbars,
-        "cash_flows" => ReadOnlyRequest::CashFlows,
-        "dynamic_leverage" => ReadOnlyRequest::DynamicLeverage,
-        "symbols_for_conversion" => ReadOnlyRequest::SymbolsForConversion,
-        _ => return Err(value("Unknown read-only operation")),
-    })
+    ReadOnlyRequest::named(name).ok_or_else(|| value("Unknown read-only operation"))
 }
 #[pyclass(module = "tl_store.ctrader._native")]
 pub struct AccountSession {
@@ -162,6 +141,12 @@ impl AccountConnection {
                 .await
                 .map_err(runtime)?;
             serde_json::to_string(&result).map_err(runtime)
+        })
+    }
+    fn state<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        let c = self.inner.clone();
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            serde_json::to_string(&c.state().await.map_err(runtime)?).map_err(runtime)
         })
     }
     fn observe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {

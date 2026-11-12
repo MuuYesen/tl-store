@@ -26,6 +26,12 @@ class NativeTransport:
     async def snapshot(self, lookback_ms=86400000, require_flat=False):
         return json.loads(await self.connection.snapshot(lookback_ms, require_flat))
 
+    async def state(self):
+        """Sample the retained native lease identity/clocks; never synthesize in Python."""
+        if self.connection is None:
+            raise RuntimeError("Account transport is closed")
+        return json.loads(await self.connection.state())
+
     async def observe(self):
         return json.loads(await self.connection.observe())
 

@@ -36,6 +36,7 @@ pub struct Connection {
     metadata: std::sync::Mutex<HashMap<u64, Value>>,
     lights: std::sync::Mutex<Value>,
     assets: std::sync::Mutex<Value>,
+    observation_session_id: String,
 }
 fn number(value: &Value, name: &str) -> Result<u64> {
     value[name]
@@ -116,11 +117,27 @@ impl Connection {
             metadata: std::sync::Mutex::new(HashMap::new()),
             lights: std::sync::Mutex::new(Value::Null),
             assets: std::sync::Mutex::new(Value::Null),
+            observation_session_id: uuid::Uuid::new_v4().to_string(),
         })
     }
     pub async fn request(&self, operation: ReadOnlyRequest, payload: Value) -> Result<Value> {
         self.lease.admission_guard().check()?;
+        let history_field = match operation {
+            ReadOnlyRequest::Orders => Some("order"),
+            ReadOnlyRequest::Deals => Some("deal"),
+            _ => None,
+        };
+        if history_field.is_some() {
+            let from = number(&payload, "fromTimestamp")?;
+            let to = number(&payload, "toTimestamp")?;
+            ensure!(from <= to && to <= 2_147_483_646_000, "Invalid history bounds");
+            ensure!(self.bound > 0, "Positive history record bound required");
+        }
         let value = self.lease.client().request(operation, payload).await?;
+        if let Some(field) = history_field {
+            ensure!(rows(&value, field)?.len() <= self.bound, "History page exceeds bound");
+            ensure!(value["hasMore"].is_boolean(), "Missing history completeness marker");
+        }
         match operation {
             ReadOnlyRequest::Symbols => {
                 *self
@@ -792,6 +809,17 @@ impl Connection {
 }
 
 impl Connection {
+    /// Local native observation point on this retained lease, never broker event time.
+    pub async fn state(&self) -> Result<Value> {
+        let epoch = self.lease.epoch();
+        let revision = self.lease.client().account_revision();
+        self.check_epoch(epoch, Some(revision)).await?;
+        let mono = monotonic_ns()?;
+        let utc = wall_ns()?;
+        self.check_epoch(epoch, Some(revision)).await?;
+        Ok(json!({"session_id":self.observation_session_id,"epoch":epoch,
+            "revision":revision,"mono_ns":mono,"utc_ns":utc}))
+    }
     pub async fn observe(&self) -> Result<Value> {
         let api = self.lease.client();
         ensure!(api.is_connected().await, "Observer account disconnected");

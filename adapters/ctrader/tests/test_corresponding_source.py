@@ -73,7 +73,7 @@ def test_recipient_source_manifest_rejects_missing_or_modified_source(tmp_path):
     directory, lock = vendor(tmp_path)
     source = pack.component_source(ROOT)
     source["adapters/ctrader/native/Cargo.lock"] = lock
-    members = pack.corresponding_source("tl_store-0.2.1a4.dist-info", source, directory)
+    members = pack.corresponding_source("tl_store-0.2.1a5.dist-info", source, directory)
     assert pack.verify_corresponding_source(members)["source_files"] == 483
     key = next(n for n in members if n.endswith("/native/src/lib.rs"))
     members[key] += b"\nmodified"
@@ -132,7 +132,7 @@ def test_recipient_extracts_approved_source_and_executable_vendor_without_git(tm
     (directory / "fixture-1.0.0/lib.rs").chmod(0o755)
     source = pack.component_source(ROOT)
     source["adapters/ctrader/native/Cargo.lock"] = lock
-    members = pack.corresponding_source("tl_store-0.2.1a4.dist-info", source, directory)
+    members = pack.corresponding_source("tl_store-0.2.1a5.dist-info", source, directory)
     wheel = tmp_path / "recipient.whl"
     with ZipFile(wheel, "w") as archive:
         for name, body in members.items():

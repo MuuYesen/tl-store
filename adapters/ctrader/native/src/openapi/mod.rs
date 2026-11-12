@@ -151,6 +151,34 @@ pub enum ReadOnlyRequest {
 }
 
 impl ReadOnlyRequest {
+    /// The existing typed read-only protocol, shared by Python and native callers.
+    pub fn named(name: &str) -> Option<Self> {
+        Some(match name {
+            "trader" => ReadOnlyRequest::Trader,
+            "orders" => ReadOnlyRequest::Orders,
+            "deals" => ReadOnlyRequest::Deals,
+            "reconcile" => ReadOnlyRequest::Reconcile,
+            "assets" => ReadOnlyRequest::Assets,
+            "asset_classes" => ReadOnlyRequest::AssetClasses,
+            "symbol_categories" => ReadOnlyRequest::SymbolCategories,
+            "symbols" => ReadOnlyRequest::Symbols,
+            "symbol_details" => ReadOnlyRequest::SymbolDetails,
+            "position_pnl" => ReadOnlyRequest::PositionPnL,
+            "order_details" => ReadOnlyRequest::OrderDetails,
+            "deals_by_position" => ReadOnlyRequest::DealsByPosition,
+            "orders_by_position" => ReadOnlyRequest::OrdersByPosition,
+            "subscribe_spots" => ReadOnlyRequest::SubscribeSpots,
+            "unsubscribe_spots" => ReadOnlyRequest::UnsubscribeSpots,
+            "subscribe_depth" => ReadOnlyRequest::SubscribeDepthQuotes,
+            "unsubscribe_depth" => ReadOnlyRequest::UnsubscribeDepthQuotes,
+            "trendbars" => ReadOnlyRequest::Trendbars,
+            "cash_flows" => ReadOnlyRequest::CashFlows,
+            "dynamic_leverage" => ReadOnlyRequest::DynamicLeverage,
+            "symbols_for_conversion" => ReadOnlyRequest::SymbolsForConversion,
+            _ => return None,
+        })
+    }
+
     const fn request_type(self) -> u32 {
         match self {
             Self::Trendbars => 2137,
