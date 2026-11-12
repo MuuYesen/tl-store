@@ -64,7 +64,7 @@ singleton, second Runtime or Store event forwarding.
 
 ## Source and Release builds
 
-The source repository `MuuYesen/TL-Store` remains private under the final
+The source repository `MuuYesen/tl-store` remains private under the final
 2026-11-12 decision. Initial repository history contains only this generic
 adapter collection and its license/build/test inputs, without LeafQuant
 deployment history or credentials. Repository access, CI artifacts, public
@@ -92,7 +92,7 @@ The CI workflow targets macOS arm64 and Debian 12 Linux x86_64 CPython
 3.13. `release.yml` reuses that same build/install qualification and defaults to
 build-only. Its optional `publish` job uses the `pypi` environment and GitHub OIDC
 trusted publishing; no registry token belongs in this repository. Configure the
-PyPI publisher for owner `MuuYesen`, repository `TL-Store`, workflow `release.yml`,
+PyPI publisher for owner `MuuYesen`, repository `tl-store`, workflow `release.yml`,
 environment `pypi` before attempting publication. Private-source CI artifacts
 are not automatically uploaded to PyPI: the publish job selects only the exact
 two qualified wheels. Existing LGPL notices require a recipient-accessible
