@@ -1,0 +1,64 @@
+name: Release build and offline tests
+on: [push, pull_request, workflow_dispatch, workflow_call]
+permissions:
+  contents: read
+jobs:
+  macos:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Qualified toolchain
+        run: |
+          rustup toolchain install 1.97.0 --profile minimal
+          rustup default 1.97.0
+          python -m pip install 'maturin==1.13.1' 'pytest>=9,<10' 'nautilus_trader==2.0.0rc7'
+      - run: python tools/check_release.py
+      - name: Optimized native wheel and corresponding source
+        run: |
+          python tools/build_release.py --out raw-dist
+          python tools/finalize_wheel.py raw-dist/*.whl dist/$(basename raw-dist/*.whl)
+          maturin sdist --out dist
+      - name: Check and install
+        run: |
+          python tools/check_release.py --wheel dist/*.whl
+          python -m pip install --no-deps --no-index --find-links dist 'tl-store==0.2.1a2'
+          python -m pip check
+          python -m pytest -q adapters/ctrader/tests --ignore=adapters/ctrader/tests/test_store.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ctrader-cp313-macos-arm64-release
+          path: dist/*
+  linux:
+    runs-on: ubuntu-22.04
+    container:
+      image: python:3.13.17-slim-bookworm@sha256:4cea12ab7d78a3312c85f8cab19b6971d4fe9704da25443986c0bc20a6678850
+    steps:
+      - name: Compiler prerequisites
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends build-essential cmake curl pkg-config ca-certificates git
+          curl --fail --location https://sh.rustup.rs -o /tmp/rustup.sh
+          sh /tmp/rustup.sh -y --profile minimal --default-toolchain 1.97.0
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+      - uses: actions/checkout@v4
+      - name: Build dependencies
+        run: python -m pip install 'maturin==1.13.1' 'pytest>=9,<10' 'nautilus_trader==2.0.0rc7'
+      - run: python tools/check_release.py
+      - name: Optimized audited wheel and corresponding source
+        run: |
+          python tools/build_release.py --out raw-dist
+          python tools/finalize_wheel.py raw-dist/*.whl dist/$(basename raw-dist/*.whl)
+          maturin sdist --out dist
+      - name: Check and install
+        run: |
+          python tools/check_release.py --wheel dist/*.whl
+          python -m pip install --no-deps --no-index --find-links dist 'tl-store==0.2.1a2'
+          python -m pip check
+          python -m pytest -q adapters/ctrader/tests --ignore=adapters/ctrader/tests/test_store.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ctrader-cp313-linux-x86_64-release
+          path: dist/*

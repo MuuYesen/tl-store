@@ -1,0 +1,41 @@
+[build-system]
+requires = ["maturin==1.13.1"]
+build-backend = "maturin"
+
+[project]
+name = "tl-store"
+version = "0.2.1a2"
+description = "TradeLearn adapter collection with built-in cTrader clients for official NautilusTrader"
+readme = "README.md"
+requires-python = ">=3.13,<3.14"
+license = "LGPL-3.0-only"
+license-files = ["adapters/ctrader/COPYING", "adapters/ctrader/COPYING.LESSER", "adapters/ctrader/NOTICE", "adapters/ctrader/LICENSES/*"]
+dependencies = ["nautilus_trader==2.0.0rc7"]
+classifiers = ["Development Status :: 3 - Alpha", "Programming Language :: Python :: 3.13", "Programming Language :: Rust"]
+
+[project.optional-dependencies]
+test = ["pytest>=9,<10"]
+
+[project.entry-points."tradelearn.store_adapters"]
+ctrader = "tl_store.ctrader:build_adapter"
+
+[project.urls]
+Repository = "https://github.com/MuuYesen/TL-Store"
+
+[tool.maturin]
+bindings = "pyo3"
+manifest-path = "adapters/ctrader/native/Cargo.toml"
+python-source = "adapters/ctrader/python"
+python-packages = ["tl_store", "lq_adapter_ctrader"]
+module-name = "lq_adapter_ctrader._native"
+features = ["extension-module"]
+include = [
+    { path = "adapters/ctrader/README.md", format = "sdist" },
+    { path = "adapters/ctrader/tests/*.py", format = "sdist" },
+    { path = "adapters/ctrader/native/Cargo.lock", format = "sdist" },
+    { path = "tools/*.py", format = "sdist" },
+    { path = ".github/workflows/ci.yml", format = "sdist" },
+    { path = ".github/workflows/release.yml", format = "sdist" },
+    { path = "LICENSE", format = "sdist" },
+]
+exclude = ["**/__pycache__/**", "**/*.pyc", "**/*.pyo", "**/target/**"]

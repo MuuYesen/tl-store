@@ -1,0 +1,5 @@
+This component includes code bearing the Nautech Systems Pty Ltd copyright and LGPL-3.0 notices. Those notices are retained. Component source is distributed under LGPL-3.0-only. The official NautilusTrader distribution is a separate dependency under its own LGPL terms and is not modified or bundled as adapter source.
+
+The Rust extension links third-party crates under their respective licenses. The exact locked dependency inventory and accompanying license texts are maintained in LICENSES. Corresponding adapter source and Cargo.lock accompany source distributions so recipients can rebuild the extension. Broker access remains subject to cTrader/Spotware service terms and user-granted OAuth authorization; this package does not grant service or account rights.
+
+Backtrader was consulted for public Store API conventions only. No GPL Backtrader implementation or singleton code is included.

@@ -1,0 +1,5 @@
+TL-Store collection tooling and the cTrader component are provided under LGPL-3.0-only.
+The complete license texts are in adapters/ctrader/COPYING.LESSER and adapters/ctrader/COPYING.
+Retain existing copyright notices. Third-party dependencies have their own terms;
+see adapters/ctrader/NOTICE and adapters/ctrader/LICENSES/inventory.json.
+Future components must declare their own compatible redistribution terms.
