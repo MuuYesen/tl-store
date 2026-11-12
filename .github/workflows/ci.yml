@@ -19,7 +19,8 @@ jobs:
       - name: Optimized native wheel and corresponding source
         run: |
           python tools/build_release.py --out raw-dist
-          python tools/finalize_wheel.py raw-dist/*.whl dist/$(basename raw-dist/*.whl)
+          cargo vendor --locked --versioned-dirs --manifest-path adapters/ctrader/native/Cargo.toml "$RUNNER_TEMP/recipient-vendor"
+          python tools/finalize_wheel.py raw-dist/*.whl dist/$(basename raw-dist/*.whl) --vendor-dir "$RUNNER_TEMP/recipient-vendor"
           maturin sdist --out dist
       - name: Check and install
         run: |
@@ -27,6 +28,28 @@ jobs:
           python -m pip install --no-deps --no-index --find-links dist 'tl-store==0.2.1a3'
           python -m pip check
           python -m pytest -q adapters/ctrader/tests --ignore=adapters/ctrader/tests/test_store.py
+      - name: Recipient source actual offline rebuild with empty Cargo home
+        run: |
+          python - <<'PY'
+          import hashlib, json, os, subprocess, sys
+          from pathlib import Path
+          workspace = Path.cwd()
+          temporary = Path(os.environ['RUNNER_TEMP'])
+          wheel = next((workspace / 'dist').glob('*.whl'))
+          source = temporary / 'recipient-rebuild-source'
+          subprocess.run([sys.executable, 'tools/finalize_wheel.py', '--extract-corresponding-source', str(wheel), '--destination', str(source)], check=True)
+          env = dict(os.environ, CARGO_HOME=str(temporary / 'recipient-empty-cargo'), CARGO_TARGET_DIR=str(temporary / 'recipient-target'), CARGO_NET_OFFLINE='true')
+          output = temporary / 'recipient-rebuilt-wheels'
+          subprocess.run([sys.executable, 'tools/build_release.py', '--offline', '--vendor-dir', str(source / 'vendor'), '--out', str(output)], cwd=source, env=env, check=True)
+          rebuilt = next(output.glob('*.whl'))
+          installed = temporary / 'recipient-rebuilt-installed'
+          subprocess.run([sys.executable, '-m', 'pip', 'install', '--no-index', '--no-deps', '--no-compile', '--target', str(installed), str(rebuilt)], check=True)
+          probe = "import hashlib,json;from pathlib import Path;import tl_store.ctrader._native as n;import tl_store.ctrader.factories;assert str(Path(n.__file__)).startswith(" + repr(str(installed)) + ");print(json.dumps({'native':str(Path(n.__file__).relative_to(" + repr(str(installed)) + ")),'native_sha256':hashlib.sha256(Path(n.__file__).read_bytes()).hexdigest()}))"
+          result = subprocess.check_output([sys.executable, '-c', probe], cwd=temporary, env=dict(os.environ, PYTHONPATH=str(installed)), text=True)
+          receipt = {'recipient_native':json.loads(result.strip().splitlines()[-1]), 'wheel_sha256':hashlib.sha256(wheel.read_bytes()).hexdigest(), 'rebuilt_wheel_sha256':hashlib.sha256(rebuilt.read_bytes()).hexdigest(), 'empty_Cargo_home':True, 'offline':True, 'source_manifest_sha256':hashlib.sha256((source/'SOURCE-MANIFEST.json').read_bytes()).hexdigest(), 'rustc':subprocess.check_output(['rustc','--version'],text=True).strip()}
+          (workspace/'dist/recipient-rebuild.json').write_text(json.dumps(receipt,indent=2)+'\n')
+          print(json.dumps(receipt))
+          PY
       - uses: actions/upload-artifact@v4
         with:
           name: ctrader-cp313-macos-arm64-release
@@ -50,7 +73,8 @@ jobs:
       - name: Optimized audited wheel and corresponding source
         run: |
           python tools/build_release.py --out raw-dist
-          python tools/finalize_wheel.py raw-dist/*.whl dist/$(basename raw-dist/*.whl)
+          cargo vendor --locked --versioned-dirs --manifest-path adapters/ctrader/native/Cargo.toml "$RUNNER_TEMP/recipient-vendor"
+          python tools/finalize_wheel.py raw-dist/*.whl dist/$(basename raw-dist/*.whl) --vendor-dir "$RUNNER_TEMP/recipient-vendor"
           maturin sdist --out dist
       - name: Check and install
         run: |
@@ -58,6 +82,28 @@ jobs:
           python -m pip install --no-deps --no-index --find-links dist 'tl-store==0.2.1a3'
           python -m pip check
           python -m pytest -q adapters/ctrader/tests --ignore=adapters/ctrader/tests/test_store.py
+      - name: Recipient source actual offline rebuild with empty Cargo home
+        run: |
+          python - <<'PY'
+          import hashlib, json, os, subprocess, sys
+          from pathlib import Path
+          workspace = Path.cwd()
+          temporary = Path(os.environ['RUNNER_TEMP'])
+          wheel = next((workspace / 'dist').glob('*.whl'))
+          source = temporary / 'recipient-rebuild-source'
+          subprocess.run([sys.executable, 'tools/finalize_wheel.py', '--extract-corresponding-source', str(wheel), '--destination', str(source)], check=True)
+          env = dict(os.environ, CARGO_HOME=str(temporary / 'recipient-empty-cargo'), CARGO_TARGET_DIR=str(temporary / 'recipient-target'), CARGO_NET_OFFLINE='true')
+          output = temporary / 'recipient-rebuilt-wheels'
+          subprocess.run([sys.executable, 'tools/build_release.py', '--offline', '--vendor-dir', str(source / 'vendor'), '--out', str(output)], cwd=source, env=env, check=True)
+          rebuilt = next(output.glob('*.whl'))
+          installed = temporary / 'recipient-rebuilt-installed'
+          subprocess.run([sys.executable, '-m', 'pip', 'install', '--no-index', '--no-deps', '--no-compile', '--target', str(installed), str(rebuilt)], check=True)
+          probe = "import hashlib,json;from pathlib import Path;import tl_store.ctrader._native as n;import tl_store.ctrader.factories;assert str(Path(n.__file__)).startswith(" + repr(str(installed)) + ");print(json.dumps({'native':str(Path(n.__file__).relative_to(" + repr(str(installed)) + ")),'native_sha256':hashlib.sha256(Path(n.__file__).read_bytes()).hexdigest()}))"
+          result = subprocess.check_output([sys.executable, '-c', probe], cwd=temporary, env=dict(os.environ, PYTHONPATH=str(installed)), text=True)
+          receipt = {'recipient_native':json.loads(result.strip().splitlines()[-1]), 'wheel_sha256':hashlib.sha256(wheel.read_bytes()).hexdigest(), 'rebuilt_wheel_sha256':hashlib.sha256(rebuilt.read_bytes()).hexdigest(), 'empty_Cargo_home':True, 'offline':True, 'source_manifest_sha256':hashlib.sha256((source/'SOURCE-MANIFEST.json').read_bytes()).hexdigest(), 'rustc':subprocess.check_output(['rustc','--version'],text=True).strip()}
+          (workspace/'dist/recipient-rebuild.json').write_text(json.dumps(receipt,indent=2)+'\n')
+          print(json.dumps(receipt))
+          PY
       - uses: actions/upload-artifact@v4
         with:
           name: ctrader-cp313-linux-x86_64-release

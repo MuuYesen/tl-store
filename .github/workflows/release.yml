@@ -3,31 +3,46 @@ on:
   workflow_dispatch:
     inputs:
       publish:
-        description: Publish qualified wheels to PyPI (requires configured trusted publisher)
+        description: Publish source-qualified wheels to PyPI
         required: true
         default: false
         type: boolean
-      corresponding_source_url:
-        description: Approved recipient-accessible corresponding-source offer for this exact version
-        required: false
+      qualified_run_id:
+        description: Successful exact-main CI run whose source-qualified wheels are reused
+        required: true
         type: string
 permissions:
   contents: read
+  actions: read
 concurrency:
   group: tl-store-release-${{ github.ref }}
   cancel-in-progress: false
 jobs:
-  build:
-    uses: ./.github/workflows/ci.yml
   qualify-distribution:
     runs-on: ubuntu-latest
-    needs: build
     steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Require successful exact-SHA private-main CI
+        env:
+          GH_TOKEN: ${{ github.token }}
+          QUALIFIED_RUN_ID: ${{ inputs.qualified_run_id }}
+        run: |
+          python - <<'PY'
+          import os
+          assert os.environ['QUALIFIED_RUN_ID'].isdigit(), 'numeric qualified CI run ID required'
+          PY
+          gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${QUALIFIED_RUN_ID}" > qualified-run.json
+          python tools/check_release.py --qualified-run qualified-run.json --sha "$GITHUB_SHA"
       - uses: actions/download-artifact@v4
         with:
           pattern: ctrader-cp313-*-release
           path: incoming
-      - name: Select exact two platform wheels; keep private source artifacts private
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.qualified_run_id }}
+      - name: Select exact two platform wheels; keep standalone source artifacts private
         run: |
           python - <<'PY'
           from pathlib import Path
@@ -40,9 +55,8 @@ jobs:
               assert path.name.startswith('tl_store-0.2.1a3-cp313-cp313-'), path
               shutil.copy2(path, Path('dist') / path.name)
           PY
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.13'
+      - name: Require exact recipient corresponding source, vendor and RECORD
+        run: python tools/check_release.py --wheel dist/*.whl
       - run: python -m pip install twine
       - run: python -m twine check dist/*.whl
       - uses: actions/upload-artifact@v4
@@ -57,16 +71,6 @@ jobs:
     permissions:
       id-token: write
     steps:
-      - name: Require exact corresponding-source distribution decision
-        env:
-          SOURCE_URL: ${{ inputs.corresponding_source_url }}
-        run: |
-          python - <<'PY'
-          import os
-          from urllib.parse import urlsplit
-          url = urlsplit(os.environ['SOURCE_URL'])
-          assert url.scheme == 'https' and url.netloc and not url.username and not url.password, 'An approved corresponding-source offer is required; a private repository alone is not a recipient offer'
-          PY
       - uses: actions/download-artifact@v4
         with:
           name: qualified-pypi-wheels

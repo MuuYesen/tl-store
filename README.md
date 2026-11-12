@@ -76,7 +76,8 @@ with Rust 1.97.0 and CPython 3.13:
 ```sh
 python -m pip install "maturin==1.13.1"
 python tools/build_release.py --out raw-dist
-python tools/finalize_wheel.py raw-dist/*.whl dist/$(basename raw-dist/*.whl)
+cargo vendor --locked --versioned-dirs --manifest-path adapters/ctrader/native/Cargo.toml /private/tmp/tl-store-vendor
+python tools/finalize_wheel.py raw-dist/*.whl dist/$(basename raw-dist/*.whl) --vendor-dir /private/tmp/tl-store-vendor
 maturin sdist --out dist
 python tools/check_release.py --wheel dist/*.whl
 ```
@@ -89,21 +90,35 @@ the complete Rust/Python implementation, locked dependencies, license notices an
 build tooling; they can also build with the declared maturin backend directly.
 
 The CI workflow targets macOS arm64 and Debian 12 Linux x86_64 CPython
-3.13. `release.yml` reuses that same build/install qualification and defaults to
-build-only. Its optional `publish` job uses the `pypi` environment and GitHub OIDC
-trusted publishing; no registry token belongs in this repository. Configure the
-PyPI publisher for owner `MuuYesen`, repository `tl-store`, workflow `release.yml`,
-environment `pypi` before attempting publication. Private-source CI artifacts
-are not automatically uploaded to PyPI: the publish job selects only the exact
-two qualified wheels. Existing LGPL notices require a recipient-accessible
-corresponding-source offer for the exact binary; the release input records its
-approved URL. A private Git repository alone does not settle this distribution
-boundary. Until that exact offer and publisher are available, build-only CI can
-proceed but public installation remains unqualified.
+3.13. Each final wheel carries the component's necessary corresponding source,
+original notices, build inputs and the complete checksum-verified locked Cargo
+vendor source under `tl_store-0.2.1a3.dist-info/corresponding-source/`.
+Recipients need no access to the private Git repository. Python runtime files
+and the attached Rust/build materials are visible to every public wheel recipient;
+Git history, CI configuration and application/account data are not included.
+No standalone public sdist or public GitHub source attachment is published.
 
-The current Linux candidate requires fresh optimized native compilation and
-installation evidence; the earlier 0.2.1a1 native bytes cannot validate its new ABI. No other platform or live broker is
-certified. Store integration tests additionally require the qualified TL build.
+CI verifies the source closure, then extracts the recipient material and performs
+an actual offline optimized rebuild with an empty Cargo home/target on both
+platforms. The rebuilt native must import from its new installed wheel. The
+existing primary offline adapter suite runs against the qualified final wheel.
+Source vendoring includes the locked dev/target dependency superset; it is not
+a claim every dependency is linked on every supported OS.
+
+`release.yml` defaults to build-only qualification and requires the successful
+exact-main CI run ID. It downloads those existing artifacts instead of rebuilding
+unchanged native code, rechecks recipient source and Twine, and uploads only the
+two qualified wheels when explicitly published. GitHub OIDC uses owner
+`MuuYesen`, repository `tl-store`, workflow `release.yml`, environment `pypi`.
+The user confirmed the PyPI pending publisher is configured; the actual OIDC
+exchange/upload is validated at release. No registry token belongs in source.
+The source repository/history remain private; wheel publication is a separate action.
+
+The actual prior Linux TL0.3/Storea3/official-NA combination passed eight offline
+installed tests after correcting a noexec qualification mount; those old wheel
+hashes do not substitute for the newly source-bearing final bytes. No other
+platform or live broker is certified. Store integration tests additionally
+require the qualified TL build.
 
 Only generic source, tests, dependencies, licenses and build tooling belong here.
 Strategies, deployment configuration, accounts, credentials and internal operating
