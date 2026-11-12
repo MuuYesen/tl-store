@@ -18,12 +18,13 @@ jobs:
           - {os: macos-15, slug: macos-arm64, python: '3.14', runtime: true, rebuild: false}
           - {os: ubuntu-22.04, slug: linux-x86_64, python: '3.13', runtime: true, rebuild: true}
           - {os: ubuntu-22.04, slug: linux-x86_64, python: '3.14', runtime: true, rebuild: false}
-          - {os: ubuntu-24.04-arm, slug: linux-aarch64, python: '3.13', runtime: false, rebuild: false}
-          - {os: ubuntu-24.04-arm, slug: linux-aarch64, python: '3.14', runtime: false, rebuild: false}
+          - {os: ubuntu-24.04-arm, slug: linux-aarch64, python: '3.13', runtime: false, rebuild: false, image: 'python:3.13.17-slim-bookworm@sha256:608b27b2db85abf38d81685085cd1166a5ed7ada66549f0dfe53a75bb830cd5d'}
+          - {os: ubuntu-24.04-arm, slug: linux-aarch64, python: '3.14', runtime: false, rebuild: false, image: 'python:3.14-slim-bookworm@sha256:735903d501abec9d901059dd4ddd52982b0baf881ff7335a803c65c39ff5f4a4'}
           - {os: windows-latest, slug: windows-amd64, python: '3.13', runtime: false, rebuild: false}
           - {os: windows-latest, slug: windows-amd64, python: '3.14', runtime: false, rebuild: false}
     env:
       CARGO_BUILD_JOBS: '2'
+      PYTHONUTF8: '1'
       MACOSX_DEPLOYMENT_TARGET: '11.0'
     steps:
       - uses: actions/checkout@v4
@@ -31,18 +32,47 @@ jobs:
         with:
           python-version: ${{ matrix.python }}
       - uses: dtolnay/rust-toolchain@master
+        if: matrix.slug != 'linux-aarch64'
         with:
           toolchain: '1.97.0'
       - name: Build tooling
+        if: matrix.slug != 'linux-aarch64'
         run: python -m pip install 'maturin==1.13.1'
       - name: Audited source and license closure
         run: python tools/check_release.py
       - name: Optimized native wheel with corresponding source
+        if: matrix.slug != 'linux-aarch64'
         run: |
           python tools/build_release.py --out raw-dist
           cargo vendor --locked --versioned-dirs --manifest-path adapters/ctrader/native/Cargo.toml "$RUNNER_TEMP/recipient-vendor"
           python tools/finalize_wheel.py raw-dist/*.whl dist/$(basename raw-dist/*.whl) --vendor-dir "$RUNNER_TEMP/recipient-vendor"
           python tools/check_release.py --wheel dist/*.whl
+      - name: Native ARM64 build in exact official Bookworm compiler base
+        if: matrix.slug == 'linux-aarch64'
+        env:
+          ARM_IMAGE: ${{ matrix.image }}
+        run: |
+          docker run --rm -i --platform linux/arm64 --mount "type=bind,src=$GITHUB_WORKSPACE,dst=/source" -w /source -e CARGO_BUILD_JOBS=2 -e PYTHONUTF8=1 -e TL_BUILD_IMAGE="$ARM_IMAGE" "$ARM_IMAGE" sh -s <<'BUILD'
+          set -eu
+          apt-get update
+          apt-get install -y --no-install-recommends build-essential cmake curl pkg-config ca-certificates git
+          git config --global --add safe.directory /source
+          curl --fail --location https://sh.rustup.rs -o /tmp/rustup.sh
+          sh /tmp/rustup.sh -y --profile minimal --default-toolchain 1.97.0
+          export PATH="/root/.cargo/bin:$PATH"
+          python -m pip install 'maturin==1.13.1'
+          python tools/check_release.py
+          python tools/build_release.py --out raw-dist
+          cargo vendor --locked --versioned-dirs --manifest-path adapters/ctrader/native/Cargo.toml /tmp/recipient-vendor
+          python tools/finalize_wheel.py raw-dist/*.whl dist/$(basename raw-dist/*.whl) --vendor-dir /tmp/recipient-vendor
+          python tools/check_release.py --wheel dist/*.whl
+          python - <<'PY'
+          import json,os,platform,subprocess,sys
+          from pathlib import Path
+          record={'image':os.environ['TL_BUILD_IMAGE'],'OS':platform.system(),'machine':platform.machine(),'python':sys.version,'rustc':subprocess.check_output(['rustc','--version'],text=True).strip()}
+          Path('dist/native-build-environment.json').write_text(json.dumps(record,indent=2)+'\n',encoding='utf-8')
+          PY
+          BUILD
       - name: Focused installed runtime; other targets remain build-only
         id: runtime
         if: matrix.runtime
@@ -83,8 +113,10 @@ jobs:
           with zipfile.ZipFile(wheel) as archive:
               native=next(n for n in archive.namelist() if n.startswith('tl_store/ctrader/_native.') and n.endswith(('.so','.pyd')))
               native_sha=hashlib.sha256(archive.read(native)).hexdigest()
+          environment=Path('dist/native-build-environment.json')
+          built=json.loads(environment.read_text(encoding='utf-8')) if environment.exists() else {'OS':platform.system(),'machine':platform.machine(),'python':sys.version}
           status=os.environ['RUNTIME_OUTCOME'];assert status in ('success','skipped'),status
-          receipt={'source_sha':os.environ['GITHUB_SHA'],'wheel':wheel.name,'wheel_sha256':hashlib.sha256(wheel.read_bytes()).hexdigest(),'native':native,'native_sha256':native_sha,'OS':platform.system(),'machine':platform.machine(),'python':sys.version,'runtime_tested':status=='success','qualification':'installed-runtime-tested' if status=='success' else 'build-only/not-runtime-tested','target':os.environ['SLUG']}
+          receipt={'source_sha':os.environ['GITHUB_SHA'],'wheel':wheel.name,'wheel_sha256':hashlib.sha256(wheel.read_bytes()).hexdigest(),'native':native,'native_sha256':native_sha,'OS':built['OS'],'machine':built['machine'],'python':built['python'],'build_environment':built,'runtime_tested':status=='success','qualification':'installed-runtime-tested' if status=='success' else 'build-only/not-runtime-tested','target':os.environ['SLUG']}
           Path('dist/platform-qualification.json').write_text(json.dumps(receipt,indent=2)+'\n')
           print(json.dumps(receipt))
           PY

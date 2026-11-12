@@ -26,11 +26,11 @@ def check_source():
         ):
             continue
         if path.suffix in (".py", ".rs", ".md", ".toml", ".yml"):
-            text = path.read_text()
+            text = path.read_text(encoding="utf-8")
             if any(value in text for value in FORBIDDEN):
                 raise ValueError(f"internal reference in {path.relative_to(ROOT)}")
         count += 1
-    inventory = json.loads((COMPONENT / "LICENSES/inventory.json").read_text())
+    inventory = json.loads((COMPONENT / "LICENSES/inventory.json").read_text(encoding="utf-8"))
     for crate in inventory["packages"]:
         assert crate["license_files"], f"missing license text: {crate['package']}"
         for item in crate["license_files"]:
@@ -134,7 +134,7 @@ if __name__ == "__main__":
     if args.qualified_run:
         print(
             json.dumps(
-                check_build_run(json.loads(args.qualified_run.read_text()), args.sha)
+                check_build_run(json.loads(args.qualified_run.read_text(encoding="utf-8")), args.sha)
             )
         )
     files, crates = check_source()

@@ -41,7 +41,7 @@ def cross_environment(args):
             'PYO3_CROSS_PYTHON_IMPLEMENTATION', '_PYTHON_SYSCONFIGDATA_NAME')):
         raise SystemExit('Clear external PYO3 cross/config overrides')
     try:
-        evidence = json.loads(args.target_python_abi.read_text())
+        evidence = json.loads(args.target_python_abi.read_text(encoding="utf-8"))
         config = evidence['config']
         if (evidence['implementation'] != 'cpython' or
                 not evidence['python_version'].startswith('3.13.') or

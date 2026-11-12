@@ -111,7 +111,7 @@ def vendor_source(directory, lock):
             crate = directory / name
             if crate.is_symlink() or not crate.is_dir():
                 raise ValueError("redirected vendor package")
-            check = json.loads((crate / ".cargo-checksum.json").read_text())
+            check = json.loads((crate / ".cargo-checksum.json").read_text(encoding="utf-8"))
             if check["package"] != checksum:
                 raise ValueError("vendor package checksum differs")
             files = {
