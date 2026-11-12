@@ -24,7 +24,6 @@ jobs:
           - {os: windows-latest, slug: windows-amd64, python: '3.14', runtime: false, rebuild: false}
     env:
       CARGO_BUILD_JOBS: '2'
-      CARGO_HOME: ${{ runner.temp }}/cargo
       PYTHONUTF8: '1'
       MACOSX_DEPLOYMENT_TARGET: '11.0'
     steps:
@@ -32,6 +31,16 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python }}
+      - name: Neutral Cargo source cache on the assigned runner
+        run: |
+          python - <<'PY'
+          import os
+          from pathlib import Path
+          cache=Path(os.environ['RUNNER_TEMP'])/'cargo'
+          cache.mkdir(exist_ok=True)
+          with open(os.environ['GITHUB_ENV'],'a',encoding='utf-8') as output:
+              output.write('CARGO_HOME='+str(cache)+'\n')
+          PY
       - uses: dtolnay/rust-toolchain@master
         if: matrix.slug != 'linux-aarch64'
         with:
