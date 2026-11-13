@@ -13,18 +13,18 @@ TradeLearn 负责可选依赖的版本锁定：
 python -m pip install "trade-learn[nautilus,tl-store]==0.3.2"
 ```
 
-**正式 TradeLearn 0.3.2 选择 Store 0.2.1a4，而不是 a6。** 独立安装 a6 不等于升级并验证了该固定组合。请使用所选 TL 发行版对应的版本和导入方式；新的 `bt.stores.NautilusStore`、普通 `bt.Strategy` 透明接线仍属 TL 后续候选，不能套用到旧正式版。
+**正式 TradeLearn 0.3.2 选择 Store 0.2.1a4，而不是 a7。** 独立安装 a7 不等于升级并验证了该固定组合。请使用所选 TL 发行版对应的版本和导入方式；新的 `bt.stores.NautilusStore`、普通 `bt.Strategy` 透明接线仍属 TL 后续候选，不能套用到旧正式版。
 
 a5新增原生只读观察状态及有界订单／成交分页，a6新增标准 NA 盘口订阅和只读拒绝码。适配器独立升级不要求未变化的 TradeLearn 代码同时发行。
 
-下一修复候选 `0.2.1a7` 正在验收盘口观测精度与下单步长的解耦；尚未发布，不能使用该版本的公网安装命令。已有a6字节不覆盖。
+0.2.1a7已正式发布，修正盘口观察价被下单digits精度拒绝的问题；保持a6已发布字节不变。公开版本元数据与文件SHA为安装依据，随包对应源码保留其构建时快照。
 
 ## 独立安装
 
-当前已发布版本为 **0.2.1a6（Alpha）**，使用 CPython **3.13 或 3.14**：
+当前已发布版本为 **0.2.1a7（Alpha）**，使用 CPython **3.13 或 3.14**：
 
 ```sh
-python -m pip install "tl-store==0.2.1a6"
+python -m pip install "tl-store==0.2.1a7"
 python -m pip check
 ```
 
