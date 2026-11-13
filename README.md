@@ -13,18 +13,20 @@ TradeLearn 负责可选依赖的版本锁定：
 python -m pip install "trade-learn[nautilus,tl-store]==0.3.2"
 ```
 
-**正式 TradeLearn 0.3.2 选择 Store 0.2.1a4，而不是 a7。** 独立安装 a7 不等于升级并验证了该固定组合。请使用所选 TL 发行版对应的版本和导入方式；新的 `bt.stores.NautilusStore`、普通 `bt.Strategy` 透明接线仍属 TL 后续候选，不能套用到旧正式版。
+**正式 TradeLearn 0.3.2 选择 Store 0.2.1a4，而不是 a8。** 安装 extra 不会自动选择新 Store。请使用所选 TL 发行版对应的版本和导入方式；新的 `bt.stores.NautilusStore`、普通 `bt.Strategy` 透明接线仍属 TL 后续候选，不能套用到旧正式版。
 
 a5新增原生只读观察状态及有界订单／成交分页，a6新增标准 NA 盘口订阅和只读拒绝码。适配器独立升级不要求未变化的 TradeLearn 代码同时发行。
 
-0.2.1a7已正式发布，修正盘口观察价被下单digits精度拒绝的问题；保持a6已发布字节不变。公开版本元数据与文件SHA为安装依据，随包对应源码保留其构建时快照。
+0.2.1a8已正式发布，修正零数量盘口、非完整观察簿删除幂等和清理错误遮蔽原始错误。a7的盘口观察精度修复保留；旧发行字节不覆盖。公开版本元数据与文件SHA为安装依据，随包对应源码保留其构建时快照。
+
+显式 `trade-learn==0.3.2` + `tl-store==0.2.1a8` + 官方 `nautilus_trader==2.0.0rc7` 已在Mac CP313实际安装、pip check及76项适配器/工厂/原生节点测试通过；这不修改032 extra中的a4锁，也不表示全部策略或自然券商能力已重新验收。新组合应显式选择版本，不与旧extra的不同固定版本混装。
 
 ## 独立安装
 
-当前已发布版本为 **0.2.1a7（Alpha）**，使用 CPython **3.13 或 3.14**：
+当前已发布版本为 **0.2.1a8（Alpha）**，使用 CPython **3.13 或 3.14**：
 
 ```sh
-python -m pip install "tl-store==0.2.1a7"
+python -m pip install "tl-store==0.2.1a8"
 python -m pip check
 ```
 
