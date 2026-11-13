@@ -4,7 +4,7 @@
 use super::depth::{DepthBook, Quote, Side};
 use serde_json::Value;
 
-pub(super) fn positive(value: &Value) -> Result<u64, &'static str> {
+fn unsigned(value: &Value) -> Result<u64, &'static str> {
     let value = match value {
         Value::Number(value) => value.as_u64(),
         Value::String(value) if !value.is_empty() && value.bytes().all(|c| c.is_ascii_digit()) => {
@@ -12,9 +12,16 @@ pub(super) fn positive(value: &Value) -> Result<u64, &'static str> {
         }
         _ => None,
     };
-    value
-        .filter(|value| *value > 0)
-        .ok_or("invalid depth integer")
+    value.ok_or("invalid depth integer")
+}
+
+pub(super) fn positive(value: &Value) -> Result<u64, &'static str> {
+    let value = unsigned(value)?;
+    if value > 0 {
+        Ok(value)
+    } else {
+        Err("invalid depth integer")
+    }
 }
 
 pub(super) fn required(payload: &Value, field: &str) -> Result<u64, &'static str> {
@@ -55,7 +62,7 @@ pub(crate) fn apply_event(
                 id: required(item, "id")?,
                 side,
                 price,
-                size: required(item, "size")?,
+                size: unsigned(item.get("size").ok_or("missing depth field")?)?,
             });
         }
         let deleted = array("deletedQuotes")?
@@ -100,6 +107,54 @@ mod tests {
     }
 
     #[test]
+    fn unsigned_size_zero_is_not_a_deletion_or_liquidity() {
+        for size in [json!(0), json!("0")] {
+            let mut book = DepthBook::new(7, 1).unwrap();
+            apply_event(
+                &mut book,
+                42,
+                7,
+                &json!({
+                    "ctidTraderAccountId":42,"symbolId":7,
+                    "newQuotes":[{"id":1,"bid":100,"size":size}]
+                }),
+            )
+            .unwrap();
+            assert!(book.levels().unwrap().0.is_empty());
+            assert!(apply_event(
+                &mut book,
+                42,
+                7,
+                &json!({
+                    "ctidTraderAccountId":42,"symbolId":7,
+                    "newQuotes":[{"id":2,"bid":99,"size":1}]
+                })
+            )
+            .is_err());
+        }
+        for size in [
+            json!(-1),
+            json!(true),
+            json!(1.5),
+            json!("18446744073709551616"),
+            json!("-1"),
+        ] {
+            let mut book = DepthBook::new(7, 1).unwrap();
+            assert!(apply_event(
+                &mut book,
+                42,
+                7,
+                &json!({
+                    "ctidTraderAccountId":42,"symbolId":7,
+                    "newQuotes":[{"id":1,"bid":100,"size":size}]
+                })
+            )
+            .is_err());
+            assert!(book.levels().is_err());
+        }
+    }
+
+    #[test]
     fn rejects_invalid_identity_or_ambiguous_quote_and_poison_epoch() {
         let mut book = DepthBook::new(7, 4).unwrap();
         let invalid = json!({"ctidTraderAccountId":"43", "symbolId":"7",
@@ -117,12 +172,12 @@ mod tests {
     }
 
     #[test]
-    fn rejects_over_capacity_zero_and_noninteger_wire_values() {
+    fn rejects_over_capacity_zero_identity_and_noninteger_wire_values() {
         for payload in [
             json!({"ctidTraderAccountId":42, "symbolId":7,
                 "newQuotes":[{"id":1,"size":100,"bid":1},{"id":2,"size":100,"bid":1}]}),
             json!({"ctidTraderAccountId":42, "symbolId":7,
-                "newQuotes":[{"id":1,"size":0,"bid":1}]}),
+                "newQuotes":[{"id":0,"size":100,"bid":1}]}),
             json!({"ctidTraderAccountId":42, "symbolId":7,
                 "newQuotes":[{"id":true,"size":100,"bid":1}]}),
             json!({"ctidTraderAccountId":42, "symbolId":7,

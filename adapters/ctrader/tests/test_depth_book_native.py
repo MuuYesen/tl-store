@@ -27,7 +27,7 @@ def test_native_depth_update_replace_delete_same_price_and_repeat_are_exact():
     event(newQuotes=[dict(id='1',bid='100',ask='101',size='1')]),
     event(newQuotes=[dict(id=True,bid='100',size='1')]),
     event(newQuotes=[dict(id='1',bid='0',size='1')]),
-    event(newQuotes=[dict(id='1',bid='100',size='0')]),
+    event(newQuotes=[dict(id='1',bid='100',size='-1')]),
 ])
 def test_native_malformed_depth_permanently_invalidates_current_epoch(payload):
     b=book()
@@ -75,3 +75,17 @@ def test_unknown_delete_never_creates_capacity_and_other_conflicts_still_invalid
         apply(b,event(newQuotes=[dict(id='1',bid='100',size='20')]))
         with pytest.raises(ValueError):apply(b,payload)
         with pytest.raises(ValueError):b.levels()
+
+
+def test_unsigned_zero_size_retains_identity_without_zero_liquidity():
+    b=book(2)
+    initial=apply(b,event(newQuotes=[dict(id='1',bid='100',size='20'),dict(id='2',ask='101',size=0)]))
+    assert initial['bids']==[['100','20']] and initial['asks']==[]
+    assert initial['complete'] is False and initial['source_ts_ns'] is None
+    assert apply(b,event(newQuotes=[dict(id='1',bid='100',size='0')]))['bids']==[]
+    assert apply(b,event(newQuotes=[dict(id='2',ask='101',size='25')]))['asks']==[['101','25']]
+    assert apply(b,event(deletedQuotes=['1','2']))['asks']==[]
+    b=book(1)
+    apply(b,event(newQuotes=[dict(id='1',bid='100',size=0)]))
+    with pytest.raises(ValueError,match='capacity'):
+        apply(b,event(newQuotes=[dict(id='2',bid='99',size=1)]))

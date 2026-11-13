@@ -228,3 +228,28 @@ def test_observation_size_preserves_centi_units_with_zero_precision_native_order
         assert instrument.size_precision==0 and str(instrument.size_increment)=='1'
         with pytest.raises(ValueError):c.contracts[1].validate_quantity(Decimal('1.01'))
     asyncio.run(run())
+
+
+def test_zero_liquidity_keeps_native_identity_but_standard_rows_stay_positive():
+    async def run():
+        c,out=client();cmd=command(c)
+        await c._subscribe_book_depth(cmd);await c._subscribe_book_deltas(cmd)
+        c.transport.events.extend([
+            depth(newQuotes=[dict(id='1',bid='10000000',size='100'),dict(id='2',ask='10001000',size=0)]),
+            depth(newQuotes=[dict(id='1',bid='10000000',size='0'),dict(id='2',ask='10001000',size='125')]),
+            depth(deletedQuotes=['1','2']),
+        ])
+        await drain(c)
+        snapshots=[x for x in out if isinstance(x,OrderBookDepth)]
+        assert len(snapshots)==3
+        assert len(snapshots[0].bids)==1 and not snapshots[0].asks
+        assert not snapshots[1].bids and str(snapshots[1].asks[0].size)=='1.25'
+        assert not snapshots[2].bids and not snapshots[2].asks
+        for snap in snapshots:
+            assert all(x.size.as_decimal()>0 for x in [*snap.bids,*snap.asks])
+            assert snap.ts_event==0
+        for batch in (x for x in out if isinstance(x,OrderBookDeltas)):
+            assert all(x.order.size.as_decimal()>0 for x in batch.deltas if x.action.name=='ADD')
+        assert c.session.failure is None
+        await c._unsubscribe_book_depth(cmd);await c._unsubscribe_book_deltas(cmd)
+    asyncio.run(run())
