@@ -169,7 +169,8 @@ def verify_corresponding_source(members, root=None):
     ):
         raise ValueError("recipient source identity differs")
     sources = manifest["files"]
-    if len(sources) != 484:
+    # a8 adds the qualified default account-values source to the a7 closure.
+    if len(sources) != 485:
         raise ValueError("recipient component source closure differs")
     expected = {KIT + n for n in sources} | {
         KIT + n
