@@ -91,10 +91,8 @@ cargo test --locked --manifest-path adapters/ctrader/native/Cargo.toml --lib
 
 发行工作流读取成功且源码一致的 CI 产物，通过 GitHub OIDC 发布 PyPI；整理文档不要求重新构建或覆盖已发布 wheel。
 
-## 源码、许可与隐私
+## 实验模块，风险自担
 
-本仓库已公开。请勿将真实账户、凭据、OAuth状态、业务策略、部署配置或内部运维记录提交到仓库、Issue、CI日志或产物中；示例使用合成值，报错时不要上传有效令牌或账户原始转储。
+本项目处于实验阶段，使用前请自行验证，相关风险由使用者承担。请勿提交真实账户、密钥或其他敏感信息。
 
-公开 wheel 同时在 `.dist-info/corresponding-source` 中提供必要对应源码、构建输入、许可通知和校验过的锁定 Cargo vendor 源，可不依赖在线仓库完成离线重建。vendor包含开发及平台依赖超集，不代表每个crate都在各平台链接。可在本地生成源码分发包；当前发行工作流向PyPI上传wheel。
-
-许可见 [LICENSE](LICENSE)、[COPYING](adapters/ctrader/COPYING)、[COPYING.LESSER](adapters/ctrader/COPYING.LESSER)、[NOTICE](adapters/ctrader/NOTICE)。保留原组件与第三方版权、许可通知。Backtrader仅作为API参考，没有复制其实现或单例。
+许可见 [LICENSE](LICENSE)、[COPYING](adapters/ctrader/COPYING)、[COPYING.LESSER](adapters/ctrader/COPYING.LESSER) 和 [NOTICE](adapters/ctrader/NOTICE)。
