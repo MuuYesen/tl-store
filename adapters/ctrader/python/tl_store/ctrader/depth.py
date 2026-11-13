@@ -5,7 +5,6 @@ from decimal import Decimal
 from nautilus_trader.model import (BookType,BookOrder,BookAction,OrderSide,Price,Quantity,
                                   OrderBookDelta,OrderBookDeltas,OrderBookDepth,RecordFlag)
 from .provider import integer
-from .reports import price
 
 BOOK_EVENT_CONTRACT = dict(book_type='L2_MBP',complete=False,source_timestamp_available=False,
                            source_sequence_available=False,order_counts_available=False,
@@ -115,10 +114,16 @@ class DepthProjection:
     def _levels(self,spec,raw,side,depth):
         result=[]
         for p,q in raw[:depth or MAX_LEVELS]:
-            px=price(Decimal(p)/100000,spec)
+            # Open API depth units describe observed liquidity, independently
+            # of the instrument's executable order price/quantity increments.
+            # Keep the existing native book as authority and project its exact
+            # wire scales; never round it to the trading grid.
+            value_price=Decimal(p)/100000
+            px=Price.from_str(format(value_price,'.5f'))
             value=Decimal(q)/100
-            size=Quantity.from_str(format(value,f'.{spec.instrument.size_precision}f'))
-            if size.as_decimal()!=value:raise ValueError('Depth size loses instrument precision')
+            size=Quantity.from_str(format(value,'.2f'))
+            if px.as_decimal()!=value_price or size.as_decimal()!=value:
+                raise ValueError('Depth observation exceeds exact native representation')
             result.append(BookOrder(side,px,size,0))
         return result
 

@@ -25,9 +25,9 @@ def normalize(value):
 
 
 ROOT = Path(__file__).resolve().parents[1]
-KIT = "tl_store-0.2.1a6.dist-info/corresponding-source/"
+KIT = "tl_store-0.2.1a7.dist-info/corresponding-source/"
 CONFIG = b'[source.crates-io]\nreplace-with = "vendored-sources"\n[source.vendored-sources]\ndirectory = "vendor"\n'
-REBUILD = b"""Recipient source for tl-store 0.2.1a6; private Git access is unnecessary.
+REBUILD = b"""Recipient source for tl-store 0.2.1a7; private Git access is unnecessary.
 Use matching CPython3.13 or3.14, Rust1.97.0, maturin1.13.1 and the ordinary platform compiler.
 From an unpacked wheel, run this supplied script:
   python tools/finalize_wheel.py --extract-corresponding-source /path/to/wheel --destination /new/source
@@ -147,7 +147,7 @@ def corresponding_source(dist_info, source, vendor):
     manifest = {
         "schema": 1,
         "project": "tl-store",
-        "version": "0.2.1a6",
+        "version": "0.2.1a7",
         "files": {n: digest(b) for n, b in source.items()},
         "vendor_sha256": digest(body),
         "locked_packages": packages,
@@ -165,7 +165,7 @@ def verify_corresponding_source(members, root=None):
     if (manifest.get("schema"), manifest.get("project"), manifest.get("version")) != (
         1,
         "tl-store",
-        "0.2.1a6",
+        "0.2.1a7",
     ):
         raise ValueError("recipient source identity differs")
     sources = manifest["files"]

@@ -12,16 +12,20 @@ from tl_store.ctrader.factories import CTraderDataClientFactory
 from tl_store.ctrader.provider import instrument_from_wire
 
 
-def test_official_node_standard_commands_reach_shared_native_book_and_return_standard_data():
+@pytest.mark.parametrize('fine',[False,True])
+def test_official_node_standard_commands_reach_shared_native_book_and_return_standard_data(fine):
     async def run():
         created=[];commands=[];received=[];requests=[]
+        rawbid='12345001' if fine else '10000000'
+        rawask='12345002' if fine else '10001000'
+        rawsize='101' if fine else '125'
         class Transport:
             account_id=42;epoch=3
             def __init__(self):self.queue=asyncio.Queue();self.closed=False
             async def request(self,name,payload):
                 requests.append((name,payload))
                 if name=='subscribe_depth':
-                    await self.queue.put(dict(payload_type=2155,received_wall_ns=999_000_000,payload=dict(ctidTraderAccountId=42,symbolId=1,newQuotes=[dict(id='1',bid='10000000',size='125'),dict(id='2',ask='10001000',size='250')])))
+                    await self.queue.put(dict(payload_type=2155,received_wall_ns=999_000_000,payload=dict(ctidTraderAccountId=42,symbolId=1,newQuotes=[dict(id='1',bid=rawbid,size=rawsize),dict(id='2',ask=rawask,size='250')])))
                 return {'ctidTraderAccountId':42}
             async def next_event(self):return await self.queue.get()
             async def halt(self):self.closed=True
@@ -73,6 +77,11 @@ def test_official_node_standard_commands_reach_shared_native_book_and_return_sta
             assert all(c.book_type==BookType.L2_MBP for c in commands if isinstance(c,(SubscribeBookDepth,SubscribeBookDeltas)))
             assert {type(v) for v in received}=={OrderBookDepth,OrderBookDeltas}
             assert all(v.ts_event==0 and v.ts_init==999_000_000 for v in received)
+            from decimal import Decimal
+            snap=next(v for v in received if isinstance(v,OrderBookDepth))
+            assert snap.bids[0].price.as_decimal()==Decimal(rawbid)/100000
+            assert snap.bids[0].size.as_decimal()==Decimal(rawsize)/100
+            assert snap.asks[0].price.as_decimal()==Decimal(rawask)/100000
             assert requests==[('subscribe_depth',{'symbolId':[1]}),('unsubscribe_depth',{'symbolId':[1]})]
             assert session.failure is None
         finally:

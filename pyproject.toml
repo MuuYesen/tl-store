@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "tl-store"
-version = "0.2.1a6"
+version = "0.2.1a7"
 description = "TradeLearn adapter collection with built-in cTrader clients for official NautilusTrader"
 readme = "README.md"
 requires-python = ">=3.13,<3.15"

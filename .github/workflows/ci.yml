@@ -89,7 +89,7 @@ jobs:
         if: matrix.runtime
         run: |
           python -m pip install 'pytest>=9,<10' 'nautilus_trader==2.0.0rc7'
-          python -m pip install --no-deps --no-index --find-links dist 'tl-store==0.2.1a6'
+          python -m pip install --no-deps --no-index --find-links dist 'tl-store==0.2.1a7'
           python -m pip check
           python -m pytest -q adapters/ctrader/tests --ignore=adapters/ctrader/tests/test_store.py
           cargo test --offline --locked --manifest-path adapters/ctrader/native/Cargo.toml --lib clock::qpc_tests

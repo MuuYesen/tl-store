@@ -55,7 +55,7 @@ def test_real_four_hooks_share_one_readonly_subscription_and_preserve_other_mode
         await drain(c)
         assert len(out)==2 and {type(x) for x in out}=={OrderBookDepth,OrderBookDeltas}
         snap=next(x for x in out if isinstance(x,OrderBookDepth))
-        assert str(snap.bids[0].price)=='100.00' and str(snap.bids[0].size)=='1.25'
+        assert str(snap.bids[0].price)=='100.00000' and str(snap.bids[0].size)=='1.25'
         assert snap.ts_event==0 and snap.ts_init==999_000_000 and snap.sequence==0
         assert snap.bid_counts==[0] and snap.ask_counts==[0]
         await c._unsubscribe_book_depth(cmd)
@@ -79,20 +79,20 @@ def test_book_replace_delete_and_multisymbol_do_not_reuse_another_book_or_quote_
         await drain(c)
         assert len(out)==3
         assert str(out[0].bids[0].size)=='1.50'
-        assert str(out[1].asks[0].price)=='200.00' and not out[1].bids
-        assert str(out[2].bids[0].price)=='99.99' and str(out[2].bids[0].size)=='0.75'
+        assert str(out[1].asks[0].price)=='200.00000' and not out[1].bids
+        assert str(out[2].bids[0].price)=='99.99000' and str(out[2].bids[0].size)=='0.75'
         assert c._last_source_ts==500 and not c._sides
     asyncio.run(run())
 
 
-@pytest.mark.parametrize('fault',['epoch','foreign','precision','ambiguous'])
+@pytest.mark.parametrize('fault',['epoch','foreign','zero-price','ambiguous'])
 def test_standard_depth_failure_poison_epoch_and_release_without_stale_success(fault):
     async def run():
         c,out=client();await c._subscribe_book_depth(command(c))
         event=depth(newQuotes=[dict(id='1',bid='10000000',size='100')])
         if fault=='epoch':c.transport.epoch=4
         elif fault=='foreign':event['payload']['ctidTraderAccountId']=43
-        elif fault=='precision':event['payload']['newQuotes'][0]['bid']='10000001'
+        elif fault=='zero-price':event['payload']['newQuotes'][0]['bid']='0'
         else:event['payload']['newQuotes'][0]['ask']='10001000'
         c.transport.events.append(event)
         with pytest.raises((ValueError,RuntimeError)):await c._events()
@@ -135,7 +135,7 @@ def test_optional_depth_bound_native_book_application_and_normal_disconnect():
         assert len(snapshots[0].bids)==2 and len(snapshots[1].bids)==1
         native=OrderBook(c.contracts[1].instrument.id,BookType.L2_MBP)
         for batch in (x for x in out if isinstance(x,OrderBookDeltas)):native.apply_deltas(batch)
-        assert str(native.best_bid_price())=='99.98'
+        assert str(native.best_bid_price())=='99.98000'
         lease=c.transport;await c._disconnect()
         assert lease.requests[-1]==('unsubscribe_depth',{'symbolId':[1]}) and lease.closed
         assert not c._depth_books and not c._depth_modes
@@ -172,4 +172,59 @@ def test_depth_event_before_ack_is_held_and_concurrent_modes_wait_for_same_ack()
         assert len(calls)==1
         assert {type(x) for x in out}=={OrderBookDepth,OrderBookDeltas}
         assert all(x.ts_event==0 and x.ts_init==999_000_000 for x in out)
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize('mode',['depth','deltas'])
+def test_observed_wire_price_is_not_quantized_to_order_price_increment(mode):
+    from decimal import Decimal
+    from nautilus_trader.model import OrderBook
+    async def run():
+        c,out=client();spec=c.contracts[1]
+        assert spec.instrument.price_precision==2
+        before=(str(spec.instrument.price_increment),str(spec.instrument.size_increment))
+        await getattr(c,'_subscribe_book_'+mode)(command(c))
+        c.transport.events.append(depth(newQuotes=[
+            dict(id='11',bid='12345001',size='101'),
+            dict(id='12',bid='12345001',size='202'),
+            dict(id='13',ask='12345002',size='199')]))
+        await drain(c)
+        assert len(out)==1
+        event=out[0]
+        if mode=='depth':
+            assert event.bids[0].price.as_decimal()==Decimal('123.45001')
+            assert event.bids[0].size.as_decimal()==Decimal('3.03')
+            assert event.asks[0].price.as_decimal()==Decimal('123.45002')
+        else:
+            native=OrderBook(spec.instrument.id,BookType.L2_MBP)
+            native.apply_deltas(event)
+            assert native.best_bid_price().as_decimal()==Decimal('123.45001')
+            assert native.best_bid_size().as_decimal()==Decimal('3.03')
+            assert native.best_ask_price().as_decimal()==Decimal('123.45002')
+        assert event.ts_event==0 and event.ts_init==999_000_000
+        assert before==(str(spec.instrument.price_increment),str(spec.instrument.size_increment))
+        # The market-data fix must not relax executable quantity admission.
+        with pytest.raises(ValueError):spec.validate_quantity(Decimal('0.001'))
+        assert c.session.failure is None and not c.transport.halted
+    asyncio.run(run())
+
+
+def test_observation_size_preserves_centi_units_with_zero_precision_native_order_instrument():
+    from decimal import Decimal
+    from dataclasses import replace
+    from nautilus_trader.model import Cfd
+    async def run():
+        c,out=client();spec=c.contracts[1]
+        # Actual NA instrument type; this deliberately tests a stricter order
+        # grid than the default provider's conservative two-decimal metadata.
+        data=Cfd.to_dict(spec.instrument)
+        data.update(size_precision=0,size_increment='1',min_quantity='1',max_quantity='10000')
+        instrument=Cfd.from_dict(data)
+        c.contracts[1]=replace(spec,instrument=instrument,minimum=Decimal(1),step=Decimal(1))
+        await c._subscribe_book_depth(command(c))
+        c.transport.events.append(depth(newQuotes=[dict(id='1',bid='12345001',size='101')]))
+        await drain(c)
+        assert out[0].bids[0].size.as_decimal()==Decimal('1.01')
+        assert instrument.size_precision==0 and str(instrument.size_increment)=='1'
+        with pytest.raises(ValueError):c.contracts[1].validate_quantity(Decimal('1.01'))
     asyncio.run(run())
