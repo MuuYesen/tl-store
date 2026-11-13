@@ -73,4 +73,3 @@ def test_actual_native_zero_negative_equity_and_available_margin_are_preserved(t
     result=a['account_provider'](N(account=lambda identity:account(raw)),N())
     assert result['cash']==float(free) and result['equity']==float(equity)
     assert result['source_epoch']==raw['epoch'] and result['source_revision']==raw['revision']
-
