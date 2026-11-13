@@ -77,3 +77,26 @@ def test_installed_entrypoint_runs_exactly_one_shared_driver(tmp_path, monkeypat
     assert calls == [engine] and engine._active_store_driver is None
     assert [event[0] for event in store.get_notifications()] == ['STARTING', 'FAILED']
     with pytest.raises(RuntimeError, match='single use'):engine.run()
+
+
+def test_default_account_values_selection_is_inert_and_consumed_by_native_broker(tmp_path):
+    import time
+    from types import SimpleNamespace as N
+    from nautilus_trader import model as m
+    from nautilus_trader.core import UUID4
+    from tradelearn_runtime.broker import NautilusBroker
+    from tl_store.ctrader.account_values import CTraderAccountValues
+    from tl_store.ctrader.execution import project_funds
+    binding=build_adapter(config(tmp_path))
+    provider=binding['account_provider']
+    assert isinstance(provider,CTraderAccountValues)
+    assert binding['exec_factories']['CTRADER'].session._native is None
+    now=time.clock_gettime_ns(time.CLOCK_MONOTONIC) if hasattr(time,'CLOCK_MONOTONIC') else time.monotonic_ns()
+    source=dict(schema_version=1,account=dict(ctid_trader_account_id=42,trader_login=100001,deposit_asset_id=2),currency='USD',epoch=3,revision=0,observed_utc_ns=time.time_ns(),started_mono_ns=now-1000000,completed_mono_ns=now-500000,clock_scope='local_observation_window',raw=dict(balance='100',net_unrealized_pnl='10',equity='110',used_margin='2',free_margin='108'))
+    balance,audit=project_funds(source)
+    event=m.AccountState(m.AccountId('CTRADER-100001'),m.AccountType.MARGIN,[balance],[],True,UUID4(),source['observed_utc_ns'],source['observed_utc_ns'],base_currency=m.Currency.from_str('USD'),info={'ctrader_funds':audit})
+    native=m.MarginAccount(event,False)
+    broker=NautilusBroker(N(account=lambda:provider(N(account=lambda identity:native),N())))
+    assert broker.getcash()==108. and broker.getvalue()==110.
+    custom=lambda *args:dict(cash=1,equity=2)
+    assert build_adapter(replace(config(tmp_path),account_provider=custom))['account_provider'] is custom

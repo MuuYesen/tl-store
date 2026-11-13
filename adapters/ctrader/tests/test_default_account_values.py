@@ -1,19 +1,17 @@
 """Default TL broker values come from the existing qualified cTrader funds info."""
-from copy import deepcopy
 from types import SimpleNamespace as N
 import time
 import pytest
 from nautilus_trader import model as m
 from nautilus_trader.core import UUID4
-from nautilus_trader.live import LiveNodeConfig
-from nautilus_trader.config import DataClientConfig,ExecutionClientConfig
-from tl_store.ctrader.config import CTraderConfig
-from tl_store.ctrader.store import CTraderStoreConfig,build_adapter
+from tl_store.ctrader.account_values import CTraderAccountValues
 from tl_store.ctrader.execution import project_funds
 
 
 def binding(tmp_path):
-    return build_adapter(CTraderStoreConfig(options=CTraderConfig(expected_login=100001,symbols=('BTCUSD',),asset_classes=('CRYPTOCURRENCY',)),node_config=LiveNodeConfig(trader_id=m.TraderId('TEST-001'),data_clients={'CTRADER':DataClientConfig()},exec_clients={'CTRADER':ExecutionClientConfig()}),state_dir=tmp_path))
+    session=N(failure=None)
+    return {'account_provider':CTraderAccountValues(session,100001),
+        'exec_factories':{'CTRADER':N(session=session)}}
 
 
 def funds():
@@ -27,7 +25,7 @@ def account(source):
     return m.MarginAccount(event,False)
 
 
-def test_default_factory_uses_actual_native_account_info_and_never_double_adds_pnl(tmp_path):
+def test_actual_native_account_info_never_double_adds_pnl(tmp_path):
     a=binding(tmp_path);provider=a['account_provider'];assert callable(provider)
     raw=funds();native=account(raw)
     class Portfolio:
@@ -37,7 +35,6 @@ def test_default_factory_uses_actual_native_account_info_and_never_double_adds_p
     assert result['cash_source']=='ctrader_free_margin'
     assert result['source_observed_utc_ns']==raw['observed_utc_ns']
     assert not any(k in result for k in ['fundvalue','fundshares'])
-    assert a['exec_factories']['CTRADER'].session._native is None
 
 
 @pytest.mark.parametrize('change',[
@@ -77,9 +74,3 @@ def test_actual_native_zero_negative_equity_and_available_margin_are_preserved(t
     assert result['cash']==float(free) and result['equity']==float(equity)
     assert result['source_epoch']==raw['epoch'] and result['source_revision']==raw['revision']
 
-
-def test_existing_native_broker_consumes_default_provider_without_strategy_wiring(tmp_path):
-    from tradelearn_runtime.broker import NautilusBroker
-    a=binding(tmp_path);native=account(funds());cache=N(account=lambda identity:native)
-    broker=NautilusBroker(N(account=lambda:a['account_provider'](cache,N())))
-    assert broker.getcash()==108. and broker.getvalue()==110.
