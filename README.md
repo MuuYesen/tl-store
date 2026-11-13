@@ -91,8 +91,8 @@ cargo test --locked --manifest-path adapters/ctrader/native/Cargo.toml --lib
 
 发行工作流读取成功且源码一致的 CI 产物，通过 GitHub OIDC 发布 PyPI；整理文档不要求重新构建或覆盖已发布 wheel。
 
-## 实验模块，风险自担
+## 使用说明
 
-本项目处于实验阶段，使用前请自行验证，相关风险由使用者承担。请勿提交真实账户、密钥或其他敏感信息。
+项目仍在持续完善，建议先在测试环境验证，再根据实际需求使用。请妥善保管账户与凭据，避免提交敏感信息。
 
 许可见 [LICENSE](LICENSE)、[COPYING](adapters/ctrader/COPYING)、[COPYING.LESSER](adapters/ctrader/COPYING.LESSER) 和 [NOTICE](adapters/ctrader/NOTICE)。
