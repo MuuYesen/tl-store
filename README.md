@@ -1,153 +1,100 @@
 # TL-Store
 
-`tl-store` is the Python distribution for the TL-Store adapter collection.
-**cTrader is its first built-in adapter**, exposed as `tl_store.ctrader` and through
-`NautilusStore(adapter="ctrader", config=...)`. It is not a separately installed
-cTrader distribution. Adapter implementations remain separated under `adapters/`;
-future adapters and dependencies will be selected explicitly, not all installed
-by default.
+面向官方 [NautilusTrader](https://github.com/nautechsystems/nautilus_trader) 的原生适配器集合。当前发行包名为 `tl-store`，内置 **cTrader** 适配器，导入路径为 `tl_store.ctrader`。
 
-**0.2.1a4 is published on public PyPI** from private source revision
-`6939669c683afb6c3500efc8686609a1e6201f8f`. Eight real native wheels cover
-CPython 3.13/3.14 on macOS arm64, Windows AMD64, Linux x86_64 and Linux aarch64
-(glibc 2.34+). Mac/Linux x86_64 passed installed offline tests; their CP313 jobs
-also rebuilt recipient source offline with an empty Cargo home. Windows and
-Linux aarch64 are **build-only, not runtime-tested**. Alpha status and the fixed
-official NA release-candidate dependency remain explicit.
+支持独立接入 NautilusTrader，也可由兼容版本的 TradeLearn Store 使用。独立使用不需要 TradeLearn、Sentinel 或平台账号，也不需要额外安装一个 cTrader 包；不会增加第二套交易引擎、账户账本或 Python 订单簿。
 
-The GitHub repository and history remain private. Each public wheel supplies
-484 necessary source/license/build files (a6 closure; a5 had483) and all 233 locked vendor crates under
-`.dist-info/corresponding-source`; private Git access is unnecessary to rebuild.
-There is no public standalone Store sdist or private-history attachment.
+## 安装
 
-## Read-only capture interface
-
-0.2.1a5 adds a native observation-point `state()` and bounded Orders/Deals pages
-on the existing retained read-only session. Integrations use the real data-client
-factory/session; no execution client, trading engine or execution journal is
-required. See [the adapter interface](adapters/ctrader/README.md#read-only-capture-seam-021a5)
-for native clock provenance, bounds, failure and lease ownership.
-
-TradeLearn0.3.2 still pins the unchanged a4 adapter. The a5 adapter revision is
-independent for data-only consumers until a later TL extra is qualified; this
-change does not require an IC installation upgrade or new Engine strategy API.
-The a4 publication and runtime evidence above remains historical a4 evidence,
-not proof of new a5 bytes. New wheels require their own exact-SHA CI/receipts.
-
-## Install through TradeLearn
-
-The recommended target command is:
+当前已发布版本为 **0.2.1a6（Alpha）**，使用 CPython **3.13 或 3.14**：
 
 ```sh
-pip install "trade-learn[nautilus,tl-store]"
-```
-
-The TL-owned `tl-store` extra pins the qualified `tl-store` distribution internally.
-Users do not specify an adapter package or its version separately. Dependencies
-are one-way: TL's optional group selects TL-Store, which depends on official
-`nautilus_trader==2.0.0rc7`. TL-Store does not depend on TL or commercial monitoring.
-
-Published TradeLearn **0.3.0** selects immutable Store **0.2.1a3** and has a
-qualified CP313 Mac arm64/Linux x86_64 combination. Its exact wheels and SDK
-freeze remain valid for current IC consumers. New TradeLearn **0.3.1 is still an
-unreleased candidate**: it selects a4 across the eight OS/ABI targets and must
-complete its own formal release gates. Installing a4 alone does not replace
-that TL dependency lock or certify new TL functionality.
-
-## Install for standalone official NA
-
-```sh
-python -m pip install "tl-store==0.2.1a4"
+python -m pip install "tl-store==0.2.1a6"
 python -m pip check
 ```
 
-Import with `from tl_store import ctrader`; native lives at
-`tl_store.ctrader._native`, with no old `lq_adapter_ctrader` alias. Standalone
-Store installs official NA without TL, commercial monitoring, account tokens
-or service enrollment. Only optional TL binding requires a qualified matching
-unified Store API2/Backtrader interface1 framework.
+依赖固定为未修改的官方 `nautilus_trader==2.0.0rc7`。构建和离线测试通过，不代表真实券商账户已获得全部能力或交易权限。
 
-See the [cTrader capability and configuration notes](adapters/ctrader/README.md).
-General TL strategy examples use official NautilusStore adapters. TL owns Cerebro,
-NautilusStore, Runtime and Broker; this package adds no account
-singleton, second Runtime or Store event forwarding.
+| 平台 | 已发布 wheel | 验证范围 |
+| --- | --- | --- |
+| macOS Apple Silicon | CPython 3.13 / 3.14 | 已安装运行离线测试；3.13完成随包对应源码离线重建 |
+| Linux x86_64，glibc 2.34+ | CPython 3.13 / 3.14 | 已安装运行离线测试；3.13完成随包对应源码离线重建 |
+| Windows x64 | CPython 3.13 / 3.14 | 仅构建通过，尚无同等运行验证 |
+| Linux ARM64，glibc 2.34+ | CPython 3.13 / 3.14 | 仅构建通过，尚无同等运行验证 |
 
-## Source and Release builds
+本次发行矩阵不包含 macOS Intel wheel。
 
-The source repository `MuuYesen/tl-store` remains private under the final
-2026-11-12 decision. Initial repository history contains only this generic
-adapter collection and its license/build/test inputs, without LeafQuant
-deployment history or credentials. Repository access, CI artifacts, public
-binary publication and actual installation are separate qualifications.
+## 接入 NautilusTrader
 
-The canonical distribution metadata is the root `pyproject.toml`. From this root,
-with Rust 1.97.0 and CPython 3.13:
+```python
+from tl_store import ctrader
+```
+
+适配器提供 `CTraderDataClientFactory`、`CTraderExecutionClientFactory`、账户配置及原生扩展 `tl_store.ctrader._native`。通过官方 NA 客户端工厂接口装配；仅采集数据时使用数据工厂保留的只读会话，不必创建执行客户端。
+
+配置、能力限制、只读采集和盘口接口见 [cTrader 使用说明](adapters/ctrader/README.md)。
+
+<a id="use-with-tradelearn"></a>
+## 接入 TradeLearn
+
+TradeLearn 负责可选依赖的版本锁定：
+
+```sh
+python -m pip install "trade-learn[nautilus,tl-store]==0.3.2"
+```
+
+**正式 TradeLearn 0.3.2 选择 Store 0.2.1a4，而不是 a6。** 独立安装 a6 不等于升级并验证了该固定组合。请使用所选 TL 发行版对应的版本和导入方式；新的 `bt.stores.NautilusStore`、普通 `bt.Strategy` 透明接线仍属 TL 后续候选，不能套用到旧正式版。
+
+a5新增原生只读观察状态及有界订单／成交分页，a6新增标准 NA 盘口订阅和只读拒绝码。适配器独立升级不要求未变化的 TradeLearn 代码同时发行。
+
+## 能力与边界
+
+- 券商元数据解析、报价、账户观察、执行报告、普通 Market IOC、撤单及指定持仓平仓。
+- 复用原生 `DepthBook` 输出标准 NA 已观察盘口；真实账户／品种的深度权限须单独核验。
+- 时间 K 线使用官方 NA 内部聚合，不另建聚合或执行循环。
+- Limit、止损、追踪和关联单仍有适配器实现限制，不能从 NA 枚举或券商协议能力推断已支持。
+- 缺少的盘口源时间、完整性和报价数量不伪造为真实市场事实。
+
+<a id="build-and-test"></a>
+## 构建与测试
+
+使用 Rust **1.97.0**、CPython 3.13/3.14、maturin **1.13.1**；发行元数据以根目录 `pyproject.toml` 为准。
 
 ```sh
 python -m pip install "maturin==1.13.1"
+python tools/check_release.py
 python tools/build_release.py --out raw-dist
-cargo vendor --locked --versioned-dirs --manifest-path adapters/ctrader/native/Cargo.toml /private/tmp/tl-store-vendor
-python tools/finalize_wheel.py raw-dist/*.whl dist/$(basename raw-dist/*.whl) --vendor-dir /private/tmp/tl-store-vendor
-maturin sdist --out dist
-python tools/check_release.py --wheel dist/*.whl
+cargo vendor --locked --versioned-dirs \
+  --manifest-path adapters/ctrader/native/Cargo.toml recipient-vendor
 ```
 
-The release wrapper uses optimized compilation and remaps local compiler paths.
-On Linux it requires a successful manylinux_2_34 audit; it does not rename an
-unaudited wheel. The finalizer normalizes SBOM source references and rebuilds
-RECORD without changing native bytes or platform tags. Source distributions contain
-the complete Rust/Python implementation, locked dependencies, license notices and
-build tooling; they can also build with the declared maturin backend directly.
+逐个处理实际生成的 wheel，将占位文件名替换为真实名称：
 
-The CI workflow targets macOS arm64 and Debian 12 Linux x86_64 CPython
-3.13. Each final wheel carries the component's necessary corresponding source,
-original notices, build inputs and the complete checksum-verified locked Cargo
-vendor source under `tl_store-0.2.1a3.dist-info/corresponding-source/`.
-Recipients need no access to the private Git repository. Python runtime files
-and the attached Rust/build materials are visible to every public wheel recipient;
-Git history, CI configuration and application/account data are not included.
-No standalone public sdist or public GitHub source attachment is published.
+```sh
+python tools/finalize_wheel.py raw-dist/<wheel>.whl dist/<wheel>.whl \
+  --vendor-dir recipient-vendor
+python tools/check_release.py --wheel dist/<wheel>.whl
+```
 
-CI verifies the source closure, then extracts the recipient material and performs
-an actual offline optimized rebuild with an empty Cargo home/target on both
-platforms. The rebuilt native must import from its new installed wheel. The
-existing primary offline adapter suite runs against the qualified final wheel.
-Source vendoring includes the locked dev/target dependency superset; it is not
-a claim every dependency is linked on every supported OS.
+构建器启用优化和编译路径重映射。Linux必须通过 manylinux 2.34 审计，不能靠重命名伪造 ABI 兼容。CI构建八个 wheel，在 macOS ARM64／Linux x86_64运行离线测试，并在其3.13任务中离线重建对应源码；Windows／Linux ARM64只证明构建。
 
-`release.yml` defaults to build-only qualification and requires the successful
-exact-main CI run ID. It downloads those existing artifacts instead of rebuilding
-unchanged native code, rechecks recipient source and Twine, and uploads only the
-two qualified wheels when explicitly published. GitHub OIDC uses owner
-`MuuYesen`, repository `tl-store`, workflow `release.yml`, environment `pypi`.
-The user confirmed the PyPI pending publisher is configured; the actual OIDC
-exchange/upload is validated at release. No registry token belongs in source.
-The source repository/history remain private; wheel publication is a separate action.
+独立测试需先安装已构建的原生扩展：
 
-The actual prior Linux TL0.3/Storea3/official-NA combination passed eight offline
-installed tests after correcting a noexec qualification mount; those old wheel
-hashes do not substitute for the newly source-bearing final bytes. No other
-platform or live broker is certified. Store integration tests additionally
-require the qualified TL build.
+```sh
+python -m pip install "pytest>=9,<10"
+python -m pytest adapters/ctrader/tests \
+  --ignore=adapters/ctrader/tests/test_store.py
+cargo test --locked --manifest-path adapters/ctrader/native/Cargo.toml --lib
+```
 
-Only generic source, tests, dependencies, licenses and build tooling belong here.
-Strategies, deployment configuration, accounts, credentials and internal operating
-records are excluded. See [LICENSE](LICENSE) and component notices. Existing
-copyright headers are retained. Backtrader was an API reference only; no GPL
-Backtrader implementation or singleton was copied.
+`test_store.py` 另需兼容的 TL adapter API 2／interface 1。测试采用合成身份、回环传输和确定性事件，不连接真实账户或下单。
 
+发行工作流读取成功且源码一致的 CI 产物，通过 GitHub OIDC 发布 PyPI；整理文档不要求重新构建或覆盖已发布 wheel。
 
-## Standard observed depth bridge (0.2.1a6)
+## 源码、许可与隐私
 
-The a6 implementation provides the four official NA book subscription and
-unsubscription hooks with one native `DepthBook` per bound account/symbol/epoch.
-The existing read-only market lease/OAuth/2155 reader is reused. `L2_MBP` deltas
-use `OrderBookDeltas`; snapshot subscriptions use fixed NA2rc7's actual
-`OrderBookDepth` type. No `OrderBookDepth10` import, new protocol or Engine
-strategy method is introduced. Native price/centi-size validation and normal
-unsubscribe/failure paths remain explicit. See the adapter's [depth contract](adapters/ctrader/README.md#standard-observed-depth-a6).
+本仓库已公开。请勿将真实账户、凭据、OAuth状态、业务策略、部署配置或内部运维记录提交到仓库、Issue、CI日志或产物中；示例使用合成值，报错时不要上传有效令牌或账户原始转储。
 
-This section describes versioned contents, not actual broker entitlement. Exact
-source/wheel/CI/public-install receipts determine distribution qualification.
-a5 consumer installations remain unchanged until an explicit qualified upgrade. A Store-only adapter release does
-not require an unchanged TradeLearn release or strategy upgrade.
+公开 wheel 同时在 `.dist-info/corresponding-source` 中提供必要对应源码、构建输入、许可通知和校验过的锁定 Cargo vendor 源，可不依赖在线仓库完成离线重建。vendor包含开发及平台依赖超集，不代表每个crate都在各平台链接。可在本地生成源码分发包；当前发行工作流向PyPI上传wheel。
+
+许可见 [LICENSE](LICENSE)、[COPYING](adapters/ctrader/COPYING)、[COPYING.LESSER](adapters/ctrader/COPYING.LESSER)、[NOTICE](adapters/ctrader/NOTICE)。保留原组件与第三方版权、许可通知。Backtrader仅作为API参考，没有复制其实现或单例。

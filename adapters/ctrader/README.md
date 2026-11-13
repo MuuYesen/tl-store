@@ -1,269 +1,79 @@
-# cTrader built-in adapter
+# cTrader 适配器
 
-cTrader is included in the `tl-store==0.2.1a3` alpha distribution and exposed as
-`tl_store.ctrader`; it is not a separate cTrader distribution. Distribution metadata
-and release builds belong to the collection root. The protocol crate is 0.2.1; the instance-credential constructor and metadata
-requests require a newly compiled native extension. Earlier wheels are not relabelled. See the collection README for exact
-installation commands and publication status.
+cTrader内置于 **tl-store 0.2.1a6**，导入路径为 `tl_store.ctrader`。安装命令、Python／平台范围见[集合说明](../../README.md)。依赖未修改的官方 `nautilus_trader==2.0.0rc7`，独立使用不依赖 TL 或监控服务。
 
-## Dependencies and capabilities
+## 配置
 
-Requires unmodified official `nautilus_trader==2.0.0rc7` and CPython 3.13. Standalone
-NA factories depend on neither TL nor a monitoring service. Optional NautilusStore
-integration requires a separately installed TL with **unified Store adapter API 2, Backtrader interface 1**;
-published TL 0.2.9 is insufficient and is rejected when the binding is selected.
-TL owns the one-way `tl-store` extra, so TL users install `trade-learn[nautilus,tl-store]` without naming an adapter distribution. The actual selected distribution is tl-store, containing cTrader. It has no reverse dependency on TL. The target command is not public-PyPI usable until compatible versions are published.
-Stop/StopLimit, trailing, Limit and linked Bracket/OCO remain adapter implementation
-gaps, rather than a claim that the broker protocol lacks those capabilities.
-The TL bridge has separate gaps; a factory or enum name does not prove venue support.
-No NA emulation is implicitly enabled.
-Matching versions alone do not authenticate the provenance of an installed binary.
+`CTraderConfig` 管理预期券商登录号、允许品种、环境、凭据和传输容量。`CTraderDataClientFactory`／`CTraderExecutionClientFactory` 接入官方 NA 工厂接口；只读采集仅需数据工厂的保留会话。
 
-Capabilities: broker-resolved instruments, Open API quotes, plain Market IOC
-orders, cancellation, typed position closes, execution reports and account
-observations. The optional Store uses official NA internal SECOND/MINUTE/HOUR/DAY
-BID/ASK/MID bars from quotes. LAST, external bars, tick-count and volume bars are
-rejected. Bar timing, empty intervals and timezone policies belong to
-LiveDataEngineConfig; the Store adds no resampling loop. Quoted size is unavailable
-and is represented as zero.
+`CTraderCredentials` 按实例接受应用Client ID／Secret和初始OAuth Access／Refresh Token，或已管理的令牌状态路径及grant标识。真实凭据和状态文件不得提交Git。owner／follower共享原有刷新锁及原子状态；follower不初始化或轮换令牌，同一grant不要启动多个刷新owner。
 
-The simple, unpublished candidate entry is:
+可选TL绑定由 `build_adapter` 提供（adapter API 2／Backtrader interface 1）。简洁参数为 `account`、`client_id`、`client_secret`、`access_token`、`refresh_token`、`practice`。`account` 是正整数**券商登录号**，不是内部cTrader账户ID，认证后解析并校验后者；`practice=True`为Demo，`False`为Live，不能隐式切换环境。
+
+已有托管凭据可使用 `token_state`、`grant_id`、`token_role`，复用同一OAuth状态。可选参数 `trader_id`、`strategy_id`、`economics`、`require_flat_on_connect`、`queue_capacity`、`max_history_records`、`history_lookback_ms`、`request_timeout_ms` 映射原配置，不另建账户声明。未知、冲突、错型参数拒绝；交易仍需账户绑定的费用证据，版本匹配不能绕过该门。
+
+高级 `CTraderStoreConfig` 组合 `CTraderConfig`、官方 `LiveNodeConfig`、可选 `StrategyConfig`、本地状态目录和权威账户provider。数据／执行客户端各配置一个 `CTRADER`。高级配置与简洁参数互斥。
+
+公开Store的导入和启动方式由所选TradeLearn发行版决定，见[版本兼容](../../README.md#use-with-tradelearn)；不能把候选语法当成旧wheel已支持。
+
+## 行情与执行
+
+当前支持元数据解析、报价、账户观察、执行报告、普通Market IOC、撤单、指定hedged持仓平仓，以及下述已观察盘口。Limit、Stop／StopLimit、追踪和Bracket／OCO关联单仍有实现缺口，不代表券商协议不支持；不隐式启用NA仿真。
+
+TL行情编译使用准确的券商品种名和元数据确认标的及资产类别。`timeframe`／正整数 `compression` 支持Seconds、Minutes、Days、Weeks、Months、Years；MicroSeconds必须是整毫秒。`price`为小写 `bid`／`ask`／`mid`，时间边界由固定NA内部聚合器负责。此路径不接受LAST、外部bar、tick-count或volume bar，不补空秒、不隐式回填历史。报价数量缺失时编码为0，并非观察到的成交量。
+
+持仓及费用必须来自权威事实，不能用余额替代权益、缺费补0或猜测仓位。`require_flat_on_connect` 是明确准入政策；指定平仓须核归属、路由和数量，普通反向单不自动等于hedged平仓。
+
+## 构建与验证
+
+常规构建、测试和平台资格统一见[根目录说明](../../README.md#build-and-test)。保持Cargo.lock、许可、原生身份和RECORD一致，不给旧二进制换版本标签。Windows／Linux ARM64构建成功不等于实际运行验证。
+
+可选交叉构建工具 `tools/export_target_python_abi.py` 及 `tools/build_release.py --target ... --target-python-abi ... --target-python-dir ...` 使用校验过的目标ABI导出，不用宿主ABI冒充目标；仍需对应工具链和目标平台安装检查。外置锁定vendor树使用 `--vendor-dir` 重映射源路径。普通用户优先安装wheel。
+
+<a id="read-only-capture-seam-021a5"></a>
+## 只读采集接口（0.2.1a5起）
+
+仅数据集成可使用真实 `CTraderDataClientFactory(options)`，保留 `await factory.session.acquire(execution=False)`；不需要执行客户端、交易引擎或执行journal。保持原生事件reader健康，结束时正常释放租约，不为每次采样新建会话。OAuth owner／follower、刷新锁、原子令牌状态与账户绑定不变。
+
+`await transport.state()` 返回原生 `session_id`、`epoch`、`revision`、`mono_ns`、`utc_ns`。不透明身份在保留连接内稳定，新连接更换身份；时钟为原生本地观察时点，不是券商事件时间。采样前后检查epoch／revision及健康状态，死连接报错，不在此调用内部重连；Python不能合成替代这些字段。
 
 ```python
-store = bt.stores.NautilusStore(
-    adapter="ctrader", account=12345678,
-    client_id="CLIENT_ID", client_secret="CLIENT_SECRET",
-    access_token="ACCESS_TOKEN", refresh_token="REFRESH_TOKEN", practice=True,
-)
-data = store.getdata(dataname="BTCUSD", timeframe=bt.TimeFrame.Seconds,
-                     compression=1, price="mid")
+page = await transport.request("orders", {
+    "fromTimestamp": start_ms,
+    "toTimestamp": end_ms,
+})
 ```
 
-`account` is the positive broker login, never the internal cTrader account ID.
-The existing authenticated account-list/trader checks resolve and verify that ID.
-`practice` must be a boolean: True selects Demo/SANDBOX, False selects Real/LIVE.
-Simple feed requests support Seconds, Minutes, Days, Weeks, Months and Years, positive integer compression,
-and MicroSeconds only when compression is an exact whole number of milliseconds.
-Calendar boundaries are delegated to the pinned NA aggregator; interval overflow is rejected.
-Prices accept lowercase bid/ask/mid. Unsupported combinations, unknown parameters and mixing
-native/simple forms fail explicitly. Bars use the official NA internal aggregator,
-with `time_bars_build_with_no_updates=False`; there is no added tick callback,
-empty-second synthesis or automatic historical backfill. Exact symbol-name lookup
-and broker symbol-category/asset-class joins happen after authentication. Missing,
-ambiguous or unsupported metadata is an error; symbol names are not classified by
-heuristic. Current class-name mapping is explicit in provider.py.
+`"deals"`同样返回原始券商分页并保留 `hasMore`。时间为非负整数，满足 `start <= end <= 2147483646000`；每页受 `max_history_records` 限制，超量或缺少布尔完整性标记拒绝。单页不代表整个历史区间完整，消费者仍须执行有界拆分／重试及原始事实校验。
 
-Simple Store optionally accepts `trader_id` and `strategy_id` (official NA identity
-fields, each defaults to `TL-001`), `economics` (`VerifiedDealEconomics`),
-`require_flat_on_connect`, `queue_capacity`, `max_history_records`,
-`history_lookback_ms` and `request_timeout_ms`. These map to the existing
-`CTraderConfig` fields, retaining their native defaults and bounds; they do not
-create another account/symbol/routing declaration. Admission flags require booleans
-and transport bounds require integers. Missing fee proof remains a trading gate.
+使用既有Orders／Deals Open API消息，不另建协议。字符串白名单不含变更操作；`execution=False` 下直接调用原生 `mutate` 也会在journal或交易I/O前拒绝。该接口不增加Engine策略方法。
 
-Advanced native connection options remain in CTraderConfig. CTraderStoreConfig combines these
-with official LiveNodeConfig, optional StrategyConfig, local state root and an
-optional authoritative account provider. Configure exactly one `CTRADER` data
-client and execution client. Account ID derives from options.expected_login;
-conflicting native declarations fail. Cash/equity reads require a qualified
-account_provider rather than an inferred balance. There is one shared session per
-Store, one existing TL Runtime/Broker/host and the NA loop, with no global singleton
-or application profile.
-
-The `tradelearn.store_adapters/ctrader` entry point loads build_adapter(config).
-Select `bt.stores.NautilusStore(adapter="ctrader", config=...)`; getdata accepts an
-internal BarType such as `SYMBOL.CTRADER-1-SECOND-MID-INTERNAL`. Constructor and
-getdata/getbroker do not connect or read secrets. Cerebro.run owns startup and
-cleanup. Unknown parameters fail. Each Store is single use; preserve account-scoped
-durable state across restarts. Strategies and account configuration remain outside
-this component.
-
-Explicit `CTraderCredentials` is per instance and its repr is redacted. It is also
-available to standalone NA users through `CTraderConfig(credentials=...)`, without
-importing TL. Supplied values never populate or fall back to process environment.
-Construction/getdata/getbroker do not load token files or create OAuth tasks.
-
-On first run the toolkit creates a private 0700 directory/0600 atomic state file
-under `~/.tradelearn/oauth/<grant-digest>/tokens.json`. The digest binds the original
-client/refresh seed; the same seed cannot silently become separate refresh owners
-for different logins/environments. Tokens have no inferred expiry: first use saves
-an unready seed and obtains a real OAuth refresh response before session admission.
-A persisted rotating/failed state stays blocked; a crash never retries a possibly
-consumed token pair. Restart with the same seed resumes the committed generation
-without overwriting refreshed credentials. Keep the toolkit state directory.
-Changing the initial seed selects a different state identity; this is not a way to
-recover an uncertain refresh.
-
-Existing managed owner/follower grants use advanced `CTraderCredentials` with their
-explicit `state_path`, `grant_id` and `role`, or simple Store `token_state`, `grant_id`,
-`token_role` fields mapped directly to those settings. Existing-state users may omit
-both seed tokens; explicit state and grant identity are then mandatory. Followers never initialize or rotate;
-the original refresh owner/lock remains authoritative. Explicit
-`import_oauth_token_state` retains operator-controlled initial import and generation
-CAS recovery. The legacy native configuration without instance credentials keeps
-its existing CTRADER_OPENAPI_* environment binding; independent grants should use
-the explicit path. Do not run a new owner beside an existing owner to reuse a grant.
-
-Monitoring is optional and uses TL's actual SQS credentials interface. The same
-sender credentials may be reused by a separately installed identity client; this
-adapter does not implement a signing service, fetch enrollment, add a platform
-token or assume cloud verification has occurred. No endpoint+token API is promised.
-
-数据说明：仅上传运行日志，不上传策略源码、券商密码、交易API密钥或OAuth凭据。
-
-## Release builds and supported targets
-
-| Target | Native build | Qualification |
-|---|---|---|
-| macOS 11+ arm64, CPython 3.13 | Optimized Release, opt-level 3, Rust 1.97.0 | Local wheel installation, official NA assembly and offline callback/cleanup tests |
-| Linux x86_64, glibc 2.34+, CPython 3.13 | Optimized 0.2.1a3 Release, Rust 1.97.0, manylinux 2.34 audit | 2026-11-10 offline clean standalone/TL/base installation qualified; live deployment pending |
-
-The 0.2.1a1 Linux wheel is historical evidence for its own source and cannot
-validate the new credential ABI. Current source, Cargo.lock, toolchain, flags and
-artifact correspondence must be recorded with the new release review. No other platform, live broker or GitHub CI run is certified.
-
-For a new build, use Rust 1.97.0, CPython 3.13 and maturin 1.13.1. From the collection root:
-
-```sh
-python -m pip install "maturin==1.13.1"
-python tools/build_release.py --interpreter python3.13 --out raw-dist
-python tools/finalize_wheel.py raw-dist/*.whl dist/$(basename raw-dist/*.whl)
-maturin sdist --out dist
-```
-
-The release wrapper requires the maturin CLI on PATH and checks both its version
-and the imported package metadata. For a `--target` tooling installation, expose
-the target scripts directory on PATH and make the target package importable; the
-`python -m maturin` launcher does not resolve that scripts directory from PATH.
-
-The release wrapper adds path remapping and, on qualified Linux builders,
-`--compatibility manylinux_2_34 --auditwheel check`. The finalizer normalizes local
-SBOM references and rebuilds RECORD without changing native bytes or wheel tags.
-The audit must succeed; renaming a native Linux wheel is not a substitute. CI uses
-a Debian 12 Python base and this same release profile. Cargo.lock is committed;
-there are no NA Rust dependencies or official-package patches. Rebuilding requires
-the locked crates (or an existing Cargo registry cache); end users should install
-qualified wheels instead of compiling by default.
-
-From the collection root run `cargo test --locked --manifest-path adapters/ctrader/native/Cargo.toml --lib` for synthetic
-protocol tests and `python -m pytest adapters/ctrader/tests --ignore=adapters/ctrader/tests/test_store.py` for
-standalone installed-adapter tests. Store tests additionally need the qualified TL
-API 2 artifact. Tests use synthetic identities, local loopback and deterministic
-replay; they are not live account, AWS or venue certification. All runtime/test
-source, Cargo.lock, COPYING, COPYING.LESSER, NOTICE and locked dependency licenses
-are included in the sdist. Existing LGPL copyright notices are retained.
-
-
-The source candidate also provides an explicit macOS arm64 to Linux x86_64
-cross-build entry. This does not certify a wheel until the Linux checks pass.
-Run `python tools/export_target_python_abi.py > target-abi.json` on the pinned
-Linux CPython 3.13 target. Preserve that JSON and decode its `sysconfigdata.base64`
-to its original basename in a dedicated target-Python directory. The build helper
-verifies both the raw file and digest. With Rust 1.97.0 host/target standard
-libraries, maturin 1.13.1 and native-host Zig 0.15.2 explicitly prepared, use:
-
-```bash
-python tools/build_release.py --offline --out dist \
-  --target x86_64-unknown-linux-gnu \
-  --target-python-abi target-abi.json --target-python-dir target-python
-```
-
-The builder supplies its own isolated Cargo/sysroot/cache directories. The helper
-uses `python3.13` as the target specification; it does not execute a Mac interpreter
-to infer Linux ABI flags. Missing or altered sysconfigdata, debug/free-threaded ABI,
-and external PyO3 configuration overrides are rejected. It keeps manylinux 2.34
-audit checks enabled and does not rename tags to claim compatibility. A real Linux
-load and clean installation remain mandatory after cross compilation. The 2026-11-10 Linux cross-build and clean installation qualified this path.
-The installed target suite has 52 passes and two strict GTD boundary xfails;
-this is offline package qualification, not live venue or public-release certification.
-
-Offline builders using a Cargo vendor directory outside CARGO_HOME must pass
-`--vendor-dir /path/to/locked/vendor` so Rust source locations map to `/vendor`.
-The original locked sources are still compiled; the native wheel check rejects
-local workspace paths. This option does not change dependency selection or ABI.
-For cross preparation, expose an existing host CPython 3.13 as `python3.13` on the
-task PATH; maturin executes it to parse the exported target sysconfigdata. Linux
-ABI values still come exclusively from the verified target file.
-
-
-## Read-only capture seam (0.2.1a5)
-
-A data-only integration can use the real `CTraderDataClientFactory(options)` and
-retain `await factory.session.acquire(execution=False)`. No execution client,
-trading engine or execution journal is required. Keep its native event reader
-healthy and release the retained lease normally; do not acquire a fresh lease
-for each sample. Existing explicit OAuth owner/follower selection, refresh lock,
-atomic token state and account binding remain unchanged.
-
-`await transport.state()` returns native `session_id`, `epoch`, `revision`,
-`mono_ns`, and `utc_ns`. The opaque identity is stable for this retained connection;
-a new connection has a new identity. The clocks are the native local observation
-point, never broker event time. Epoch/revision health is fenced before and after
-sampling; dead connections fail and never reconnect inside this call. Python
-must not synthesize or replace these fields.
-
-`await transport.request("orders", {"fromTimestamp": start_ms, "toTimestamp": end_ms})`
-and the same call with `"deals"` return an original broker page, retaining
-`hasMore`. Timestamps must be nonnegative integers with start <= end and
-end <= 2147483646000. Each page is bounded by the lease's explicit
-`max_history_records`; excessive rows or missing/nonboolean completeness markers
-fail. A page is not a complete historical interval: the existing consumer must
-keep its bounded split/retry and raw-facts validation. The native request types
-remain the existing Orders/Deals Open API messages, not a second protocol.
-All mutation names are absent from this string allowlist, and even direct native
-`mutate` rejects every command on an execution=False connection before journal
-or trading I/O. This seam adds no Engine strategy methods or user glue.
-
-The 0.3.2 TradeLearn extra still selects the unchanged public Store a4; a5 is an
-independent adapter revision until a later TL extra is qualified. Existing IC
-installations need not wait for this read-only change. Public wheel source/license/
-build material delivery stays under `.dist-info/corresponding-source`; no standalone
-source or private-history publication is added.
-
+TL版本锁见[版本兼容](../../README.md#use-with-tradelearn)。公开wheel、只读观察及离线验证不证明真实账户具有深度或交易权限。
 
 <a id="standard-observed-depth-a6"></a>
-## Standard observed depth (0.2.1a6 contract)
+## 标准已观察盘口（0.2.1a6）
 
-`CTraderDataClient` implements `_subscribe_book_deltas`, `_unsubscribe_book_deltas`,
-`_subscribe_book_depth` and `_unsubscribe_book_depth` through the same factory,
-`execution=False, market=True` lease and event reader. Commands require
-`BookType.L2_MBP`; `depth=None/0` selects all currently observed levels up to the
-1000-level output bound, positive integer depth selects a prefix. Limits are ten
-symbols and10000 native entries each, matching the existing native100000 total
-entry bound. Mode subscriptions for a symbol share its native request/book;
-concurrent modes await the same real subscribe ACK. Last-mode unsubscribe sends
-one real unsubscribe request. Normal disconnect withdraws remaining subscriptions
-and always releases its lease; unknown unsubscribe failure is not successful ACK.
+`CTraderDataClient` 实现 `_subscribe_book_deltas`、`_unsubscribe_book_deltas`、`_subscribe_book_depth`、`_unsubscribe_book_depth`，复用同一factory、`execution=False, market=True`租约和reader。
 
-The original native `DepthBook`/`depth_wire` owns quote IDs, insert/replace/delete,
-same-price aggregation, crossed/overflow/capacity and identity validation. Its
-Python extension is a thin export, not a Python order book or another execution
-loop. `OrderBookDeltas` publishes a grouped CLEAR plus ADD of the known observed
-view, with MBP and final-record flags. `_subscribe_book_depth` publishes fixed
-NA2rc7 `OrderBookDepth` directly (that release exports no `OrderBookDepth10`).
-The two output types go through standard `_handle_data`/`_output.data`.
+订阅要求 `BookType.L2_MBP`；`depth=None/0`选择已观察档位（输出上限1000），正整数选择前缀。最多10个品种，每品种10000原生条目，总容量100000。同品种不同订阅模式共享原生请求／订单簿，并发模式等待同一真实ACK；最后一个模式退订时发送一次原生退订。断连会退订并释放租约，未知退订失败不能算ACK成功。
 
-Protocol2155 supplies no source timestamp, source sequence, full-market snapshot
-or customer-order count. Output `ts_event=0` and `sequence=0` explicitly mean
-unavailable; `ts_init` is the original positive native receive UTC clock, not a
-new publication time. Consumers map source timestamp to null and keep
-`complete=false`; no F_SNAPSHOT claim is added. Depth order counts are zero as
-unavailable metadata, not evidence of zero underlying orders. Raw price/100000
-and size/100 are converted with Decimal and exact instrument precision; rounding
-is rejected. A depth event never advances QuoteTick source clock/freshness.
+原生 `DepthBook`／`depth_wire` 唯一维护quote ID、增改删、同价聚合、交叉／溢出／容量及身份校验；Python只是薄出口，不维护第二个簿。`OrderBookDeltas` 按已观察视图输出成组CLEAR＋ADD及MBP／最终记录标记；深度快照输出固定NA2rc7实际类型 `OrderBookDepth`，不使用该版本不存在的 `OrderBookDepth10`。二者沿标准 `_handle_data`／`_output.data` 输出。
 
-On a changed transport epoch, invalid identity/side/price/size, wire/capacity or
-precision error, the native book is invalidated and the existing halt/session
-failure path closes admission. A new connection requires a new book; no hidden
-reconnect or stale-epoch replay occurs. Repeated valid updates replace native
-quote IDs; an unprovable duplicate deletion remains a fail-closed invalid event.
-Collector should map these standard observed snapshots into its current view;
-raw2155 tee is evidence only, not another independently accumulated book.
+### 缺失事实与时钟
 
-Correlated read-only50/2142 errors preserve only the original bounded protocol
-`errorCode`, exposed as `tl_store.ctrader.errors.CTraderRequestRejected.error_code`.
-Descriptions/account/order payloads are excluded. A missing or non-code field is
-None, not a manufactured broker code. Other native failures retain their original
-type/cause. Actual account/symbol depth entitlement and2157/2155/error evidence
-are a separate authorized read-only consumer qualification, not implied by
-quotes, factory construction or offline tests. No orders are used for this gate.
+协议2155没有源时间戳、源序号、全市场完整快照或客户订单数：
+
+- `ts_event=0`、`sequence=0`表示不可用，不是已知源时间／序号。
+- `ts_init`保留原生接收UTC时钟，不改成Python发布时间。
+- 消费者源时间用null、`complete=false`；不添加完整 `F_SNAPSHOT` 声明。
+- 订单数0表示元数据不可用，不代表真实没有订单。
+- 原始价格／100000、数量／100通过Decimal及标的精度准确转换，不允许舍入。
+- 深度事件不刷新QuoteTick的来源时钟或新鲜度。
+
+传输epoch变化、错误身份／方向／价格／数量、协议／容量或精度失败会使原生簿失效，并沿既有失败路径关闭准入。新连接必须建立新簿，不隐藏重连或重放旧epoch。重复有效更新替换同quote ID，无法证明的重复删除保持失败关闭。消费者仅将标准已观察快照投影到当前视图；raw2155旁路只作证据，不再累计一份订单簿。
+
+### 拒绝与账户权限
+
+关联的只读50／2142错误只保留原始有界 `errorCode`，通过 `tl_store.ctrader.errors.CTraderRequestRejected.error_code` 提供。排除描述、账户及订单正文；缺失或不合法的code为None，不猜测错误码。其他原生错误保留原类型／原因。
+
+真实账户／品种的深度权限、2157／2155或拒绝码证据须由授权只读消费者单独验证，不能用报价成功、工厂构造或离线测试替代；验证不使用交易订单。
