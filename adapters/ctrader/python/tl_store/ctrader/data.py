@@ -6,6 +6,7 @@ from nautilus_trader.live.clients import MarketDataClient
 from nautilus_trader.model import Quantity, QuoteTick
 from .provider import integer, load_contracts
 from .reports import price
+from .errors import _cleanup_after_failure, _remember_cleanup
 
 
 class CTraderDataClient(MarketDataClient):
@@ -18,6 +19,7 @@ class CTraderDataClient(MarketDataClient):
         self._sides = {}
         self._reader = None
         self._last_source_ts = 0
+        self.background_errors = []
         from .depth import DepthProjection
         self._depth = DepthProjection(self)
         self._depth_modes, self._depth_books = self._depth.modes, self._depth.books
@@ -32,33 +34,39 @@ class CTraderDataClient(MarketDataClient):
             for spec in self.contracts.values():
                 self._handle_instrument(spec.instrument)
             self._reader = self.create_task(self._events(), "ctrader-openapi-quotes")
-        except BaseException:
-            await self._disconnect()
+        except BaseException as error:
+            await _cleanup_after_failure(self,error,self._disconnect)
             raise
 
     async def _disconnect(self):
-        self.background_errors = []
+        self.background_errors = list(getattr(self,'background_errors',()))
+        primary=None
         try:
             if self._reader:
                 self._reader.cancel()
                 outcomes = await asyncio.gather(self._reader, return_exceptions=True)
-                self.background_errors = [
-                    e
-                    for e in outcomes
-                    if isinstance(e, BaseException)
-                    and not isinstance(e, asyncio.CancelledError)
-                ]
-        finally:
-            self._reader = None
+                self.background_errors.extend(e for e in outcomes
+                    if isinstance(e,BaseException) and not isinstance(e,asyncio.CancelledError))
+        except BaseException as error:
+            primary=error
+        try:
             if self.transport:
-                depth = getattr(self, '_depth', None)
+                depth=getattr(self,'_depth',None)
                 if depth is not None:
-                    self.background_errors.extend(await depth.shutdown())
-                await self.transport.close()
-            self.transport = None
+                    try:self.background_errors.extend(await depth.shutdown())
+                    except BaseException as error:
+                        if primary is None:primary=error
+                        else:_remember_cleanup(self,primary,error)
+                try:await self.transport.close()
+                except BaseException as error:
+                    if primary is None:primary=error
+                    else:_remember_cleanup(self,primary,error)
+        finally:
+            self._reader = self.transport = None
             self._sides.clear()
             self._subscribed.clear()
             self._last_source_ts = 0
+        if primary is not None:raise primary
 
     def _spec(self, instrument_id):
         matches = [
@@ -100,10 +108,11 @@ class CTraderDataClient(MarketDataClient):
             raise
         except BaseException as error:
             depth = getattr(self, '_depth', None)
-            if depth is not None:depth.invalidate()
-            if self.transport is not None:
-                await self.transport.halt()
-            await self.session.fail(error)
+            operations=[]
+            if depth is not None:operations.append(depth.invalidate)
+            if self.transport is not None:operations.append(self.transport.halt)
+            operations.append(lambda:self.session.fail(error))
+            await _cleanup_after_failure(self,error,*operations)
             raise
 
     async def _events_inner(self):

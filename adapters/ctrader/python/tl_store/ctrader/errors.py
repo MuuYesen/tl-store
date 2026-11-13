@@ -23,3 +23,23 @@ class CTraderRequestRejected(RuntimeError):
         self.error_code=error_code
         suffix='' if error_code is None else f' [errorCode={error_code}]'
         super().__init__('Open API rejected request'+suffix)
+
+
+def _remember_cleanup(owner,primary,secondary):
+    """Keep diagnostic objects without replacing/formatting the primary cause."""
+    if secondary is primary:return
+    errors=getattr(owner,'background_errors',None)
+    if errors is None:owner.background_errors=errors=[]
+    errors.append(secondary)
+    note='cTrader cleanup also failed; primary error retained'
+    if note not in getattr(primary,'__notes__',()):primary.add_note(note)
+
+
+async def _cleanup_after_failure(owner,primary,*operations):
+    import inspect
+    for operation in operations:
+        try:
+            result=operation()
+            if inspect.isawaitable(result):await result
+        except BaseException as secondary:
+            _remember_cleanup(owner,primary,secondary)

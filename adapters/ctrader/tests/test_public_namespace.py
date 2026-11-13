@@ -11,7 +11,7 @@ def test_public_namespace_owns_classes_and_native_without_old_alias():
     assert ctrader.CTraderAccountSession.__module__ == 'tl_store.ctrader.session'
     assert _native.__name__ == 'tl_store.ctrader._native'
     assert find_spec('lq_adapter_ctrader') is None
-    assert distribution('tl-store').version == '0.2.1a7'
+    assert distribution('tl-store').version == '0.2.1a8'
     with pytest.raises(PackageNotFoundError):
         distribution('lq-adapter-ctrader')
     assert not any('trade-learn' in r or 'leafquant' in r for r in distribution('tl-store').requires)

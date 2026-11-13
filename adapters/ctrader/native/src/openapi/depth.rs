@@ -84,7 +84,7 @@ impl DepthBook {
         }
         let mut seen = HashSet::new();
         for id in deleted {
-            if *id == 0 || !seen.insert(*id) || !self.entries.contains_key(id) {
+            if *id == 0 || !seen.insert(*id) {
                 return Err("invalid depth deletion");
             }
         }
@@ -97,7 +97,14 @@ impl DepthBook {
                 added += 1;
             }
         }
-        if self.entries.len() - deleted.len() + added > self.max_entries {
+        // The broker sends changes, not a certified complete snapshot. A
+        // repeated deletion or a quote never observed in this epoch is a no-op
+        // on our partial view. It must not free nonexistent capacity.
+        let removed = deleted
+            .iter()
+            .filter(|id| self.entries.contains_key(id))
+            .count();
+        if self.entries.len() - removed + added > self.max_entries {
             return Err("depth capacity exceeded");
         }
         let mut bids = BTreeMap::<u64, u64>::new();
@@ -283,5 +290,46 @@ mod tests {
         )
         .unwrap();
         assert_eq!(book.levels().unwrap().0, &[(100, 4)]);
+    }
+
+    #[test]
+    fn repeated_and_unobserved_deletions_are_idempotent_partial_book_changes() {
+        let mut book = DepthBook::new(7, 2).unwrap();
+        let a = Quote {
+            id: 1,
+            side: Side::Bid,
+            price: 100,
+            size: 20,
+        };
+        let b = Quote {
+            id: 2,
+            side: Side::Ask,
+            price: 102,
+            size: 30,
+        };
+        book.apply(7, &[a, b], &[]).unwrap();
+        book.apply(7, &[], &[99]).unwrap();
+        assert_eq!(book.levels().unwrap().0, &[(100, 20)]);
+        book.apply(7, &[], &[1]).unwrap();
+        book.apply(7, &[], &[1]).unwrap();
+        assert!(book.levels().unwrap().0.is_empty());
+        assert_eq!(book.levels().unwrap().1, &[(102, 30)]);
+    }
+
+    #[test]
+    fn unknown_deletion_does_not_free_capacity_or_underflow_observed_count() {
+        let mut book = DepthBook::new(7, 1).unwrap();
+        let a = Quote {
+            id: 1,
+            side: Side::Bid,
+            price: 100,
+            size: 20,
+        };
+        book.apply(7, &[a], &[]).unwrap();
+        assert!(book.apply(7, &[Quote { id: 2, ..a }], &[99]).is_err());
+        assert!(book.levels().is_err());
+        let mut empty = DepthBook::new(7, 1).unwrap();
+        empty.apply(7, &[], &[99]).unwrap();
+        assert!(empty.levels().unwrap().0.is_empty());
     }
 }
