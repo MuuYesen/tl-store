@@ -1,38 +1,8 @@
 # TL-Store
 
-面向官方 [NautilusTrader](https://github.com/nautechsystems/nautilus_trader) 的原生适配器集合。当前发行包名为 `tl-store`，内置 **cTrader** 适配器，导入路径为 `tl_store.ctrader`。
+**TL-Store 是 TradeLearn 的适配器集合**，负责接入不同的交易平台与行情来源。适配器按组件独立维护，用户通过 TradeLearn 的 Store 接口配置和使用。
 
-支持独立接入 NautilusTrader，也可由兼容版本的 TradeLearn Store 使用。独立使用不需要 TradeLearn、Sentinel 或平台账号，也不需要额外安装一个 cTrader 包；不会增加第二套交易引擎、账户账本或 Python 订单簿。
-
-## 安装
-
-当前已发布版本为 **0.2.1a6（Alpha）**，使用 CPython **3.13 或 3.14**：
-
-```sh
-python -m pip install "tl-store==0.2.1a6"
-python -m pip check
-```
-
-依赖固定为未修改的官方 `nautilus_trader==2.0.0rc7`。构建和离线测试通过，不代表真实券商账户已获得全部能力或交易权限。
-
-| 平台 | 已发布 wheel | 验证范围 |
-| --- | --- | --- |
-| macOS Apple Silicon | CPython 3.13 / 3.14 | 已安装运行离线测试；3.13完成随包对应源码离线重建 |
-| Linux x86_64，glibc 2.34+ | CPython 3.13 / 3.14 | 已安装运行离线测试；3.13完成随包对应源码离线重建 |
-| Windows x64 | CPython 3.13 / 3.14 | 仅构建通过，尚无同等运行验证 |
-| Linux ARM64，glibc 2.34+ | CPython 3.13 / 3.14 | 仅构建通过，尚无同等运行验证 |
-
-本次发行矩阵不包含 macOS Intel wheel。
-
-## 接入 NautilusTrader
-
-```python
-from tl_store import ctrader
-```
-
-适配器提供 `CTraderDataClientFactory`、`CTraderExecutionClientFactory`、账户配置及原生扩展 `tl_store.ctrader._native`。通过官方 NA 客户端工厂接口装配；仅采集数据时使用数据工厂保留的只读会话，不必创建执行客户端。
-
-配置、能力限制、只读采集和盘口接口见 [cTrader 使用说明](adapters/ctrader/README.md)。
+当前发行包为 `tl-store`，首个内置组件是 **cTrader**，导入路径为 `tl_store.ctrader`。当前支持的框架为 NautilusTrader，用于承接执行与行情能力；后续适配按组件扩展。
 
 <a id="use-with-tradelearn"></a>
 ## 接入 TradeLearn
@@ -46,6 +16,36 @@ python -m pip install "trade-learn[nautilus,tl-store]==0.3.2"
 **正式 TradeLearn 0.3.2 选择 Store 0.2.1a4，而不是 a6。** 独立安装 a6 不等于升级并验证了该固定组合。请使用所选 TL 发行版对应的版本和导入方式；新的 `bt.stores.NautilusStore`、普通 `bt.Strategy` 透明接线仍属 TL 后续候选，不能套用到旧正式版。
 
 a5新增原生只读观察状态及有界订单／成交分页，a6新增标准 NA 盘口订阅和只读拒绝码。适配器独立升级不要求未变化的 TradeLearn 代码同时发行。
+
+## 独立安装
+
+当前已发布版本为 **0.2.1a6（Alpha）**，使用 CPython **3.13 或 3.14**：
+
+```sh
+python -m pip install "tl-store==0.2.1a6"
+python -m pip check
+```
+
+当前实现依赖固定为未修改的官方 `nautilus_trader==2.0.0rc7`。构建和离线测试通过，不代表真实券商账户已获得全部能力或交易权限。
+
+| 平台 | 已发布 wheel | 验证范围 |
+| --- | --- | --- |
+| macOS Apple Silicon | CPython 3.13 / 3.14 | 已安装运行离线测试；3.13完成随包对应源码离线重建 |
+| Linux x86_64，glibc 2.34+ | CPython 3.13 / 3.14 | 已安装运行离线测试；3.13完成随包对应源码离线重建 |
+| Windows x64 | CPython 3.13 / 3.14 | 仅构建通过，尚无同等运行验证 |
+| Linux ARM64，glibc 2.34+ | CPython 3.13 / 3.14 | 仅构建通过，尚无同等运行验证 |
+
+本次发行矩阵不包含 macOS Intel wheel。
+
+## 当前框架：NautilusTrader
+
+```python
+from tl_store import ctrader
+```
+
+除通过TL接入外，当前适配器也可独立用于NautilusTrader，不要求安装TL或监控服务。适配器提供 `CTraderDataClientFactory`、`CTraderExecutionClientFactory`、账户配置及原生扩展 `tl_store.ctrader._native`。通过官方 NA 客户端工厂接口装配；仅采集数据时使用数据工厂保留的只读会话，不必创建执行客户端。
+
+配置、能力限制、只读采集和盘口接口见 [cTrader 使用说明](adapters/ctrader/README.md)。
 
 ## 能力与边界
 

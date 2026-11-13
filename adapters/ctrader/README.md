@@ -1,6 +1,8 @@
 # cTrader 适配器
 
-cTrader内置于 **tl-store 0.2.1a6**，导入路径为 `tl_store.ctrader`。安装命令、Python／平台范围见[集合说明](../../README.md)。依赖未修改的官方 `nautilus_trader==2.0.0rc7`，独立使用不依赖 TL 或监控服务。
+cTrader是 **TradeLearn适配器集合TL-Store** 的首个内置组件，随 `tl-store 0.2.1a6` 发行，导入路径为 `tl_store.ctrader`。安装命令、Python／平台范围见[集合说明](../../README.md)。
+
+当前组件通过未修改的官方 `nautilus_trader==2.0.0rc7` 承接执行与行情，也可独立装配到该框架。
 
 ## 配置
 
@@ -8,7 +10,7 @@ cTrader内置于 **tl-store 0.2.1a6**，导入路径为 `tl_store.ctrader`。安
 
 `CTraderCredentials` 按实例接受应用Client ID／Secret和初始OAuth Access／Refresh Token，或已管理的令牌状态路径及grant标识。真实凭据和状态文件不得提交Git。owner／follower共享原有刷新锁及原子状态；follower不初始化或轮换令牌，同一grant不要启动多个刷新owner。
 
-可选TL绑定由 `build_adapter` 提供（adapter API 2／Backtrader interface 1）。简洁参数为 `account`、`client_id`、`client_secret`、`access_token`、`refresh_token`、`practice`。`account` 是正整数**券商登录号**，不是内部cTrader账户ID，认证后解析并校验后者；`practice=True`为Demo，`False`为Live，不能隐式切换环境。
+TradeLearn绑定由 `build_adapter` 提供（adapter API 2／Backtrader interface 1）。简洁参数为 `account`、`client_id`、`client_secret`、`access_token`、`refresh_token`、`practice`。`account` 是正整数**券商登录号**，不是内部cTrader账户ID，认证后解析并校验后者；`practice=True`为Demo，`False`为Live，不能隐式切换环境。
 
 已有托管凭据可使用 `token_state`、`grant_id`、`token_role`，复用同一OAuth状态。可选参数 `trader_id`、`strategy_id`、`economics`、`require_flat_on_connect`、`queue_capacity`、`max_history_records`、`history_lookback_ms`、`request_timeout_ms` 映射原配置，不另建账户声明。未知、冲突、错型参数拒绝；交易仍需账户绑定的费用证据，版本匹配不能绕过该门。
 
