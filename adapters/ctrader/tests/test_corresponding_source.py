@@ -63,7 +63,8 @@ def test_vendor_rejects_incomplete_or_unreviewed_files(tmp_path, fault):
 
 def test_approved_component_source_scope_excludes_tests_history_and_old_alias():
     files = pack.component_source(ROOT)
-    assert len(files) == 484
+    assert "adapters/ctrader/python/tl_store/ctrader/account_values.py" in files
+    assert len(files) == 485
     assert "adapters/ctrader/native/src/lib.rs" in files
     assert all(".git/" not in n and not n.startswith(".github/") for n in files)
     assert not any("/tests/" in n or "lq_adapter_ctrader" in n for n in files)
@@ -73,8 +74,8 @@ def test_recipient_source_manifest_rejects_missing_or_modified_source(tmp_path):
     directory, lock = vendor(tmp_path)
     source = pack.component_source(ROOT)
     source["adapters/ctrader/native/Cargo.lock"] = lock
-    members = pack.corresponding_source("tl_store-0.2.1a7.dist-info", source, directory)
-    assert pack.verify_corresponding_source(members)["source_files"] == 484
+    members = pack.corresponding_source("tl_store-0.2.1a8.dist-info", source, directory)
+    assert pack.verify_corresponding_source(members)["source_files"] == 485
     key = next(n for n in members if n.endswith("/native/src/lib.rs"))
     members[key] += b"\nmodified"
     with pytest.raises(ValueError, match="source digest"):
@@ -132,13 +133,13 @@ def test_recipient_extracts_approved_source_and_executable_vendor_without_git(tm
     (directory / "fixture-1.0.0/lib.rs").chmod(0o755)
     source = pack.component_source(ROOT)
     source["adapters/ctrader/native/Cargo.lock"] = lock
-    members = pack.corresponding_source("tl_store-0.2.1a7.dist-info", source, directory)
+    members = pack.corresponding_source("tl_store-0.2.1a8.dist-info", source, directory)
     wheel = tmp_path / "recipient.whl"
     with ZipFile(wheel, "w") as archive:
         for name, body in members.items():
             archive.writestr(name, body)
     output = tmp_path / "extracted"
-    assert pack.extract_source(wheel, output)["source_files"] == 484
+    assert pack.extract_source(wheel, output)["source_files"] == 485
     assert not (output / ".git").exists()
     assert (output / "adapters/ctrader/native/src/lib.rs").read_bytes() == source[
         "adapters/ctrader/native/src/lib.rs"

@@ -84,3 +84,14 @@ TL版本锁见[版本兼容](../../README.md#use-with-tradelearn)。公开wheel�
 ### 盘口精度修复（0.2.1a7，已发布）
 
 Open API盘口原生整数价格单位为1/100000，数量单位为1/100。标准NA book事件按五位价格、两位数量精确投影，不将观察到的流动性舍入或拒绝到可执行订单的price/size increment。盘口聚合、增删与epoch仍只由既有原生DepthBook负责；下单数量、订单步长、成交报告的准入守门不因此放宽。a6在盘口映射中复用了下单价格精度守门，会拒绝比交易digits更细的合法观察；a7已通过八个平台构建，Mac/Linux实际安装与对应源离线重建，正式PyPI文件已核对；Windows/Linux ARM64仍仅build-only，不覆盖a6文件。自然账户盘口资格由实际订阅与事件另验。
+
+### 后续源码修正（0.2.1a8 候选，未发行）
+
+异常退出正在补充保留原始采样/认证错误：halt、退订或释放期间的次级异常不替换第一原因；本消费者的引用仍在 finally 中释放，次级诊断单列保留。该修正已通过离线反例与标准 book 接缝回归，尚未进入新正式 wheel。正式 a7 的真实联合运行仍存在待定位异常，不能因已收到两侧盘口便称整体采集通过；不会通过放宽 book 验证、伪造账户身份或另建连接绕过。
+
+
+同一候选还修正非完整观察簿的删除幂等性：已删除或本 epoch 从未观察到的正整数 quote ID 再次删除是无变化操作，不能使整个 epoch 失效；未知删除也不能释放任何不存在的容量。错误身份、重复字段冲突、非法数值、超限、交叉簿与溢出仍拒绝，`complete=false` 和无源时间的事实保留。该确定性重复删除反例独立于自然失败根因；没有据此宣称账户首次认证错误或真实联合采集已修好。
+
+同一 a8 候选按官方 `ProtoOADepthQuote.size` 的 uint64 契约接受零数量。原生簿保留该 quote ID 直到显式删除，但零贡献不进入聚合档位，标准 `OrderBookDepth` / `OrderBookDeltas` 不输出零数量 ADD。零数量不等于 `deletedQuotes`，仍占用有界 ID 容量；负数、非整数、溢出以及非法价格/身份继续使当前 epoch 失效。合成反例已在正式 a7 复现，原生核心修复已验；新绑定与标准输出待候选 CI。自然失败帧仅有结构摘要，两个 size 未满足正整数条件，尚不能判定它们为零或把此修复称自然因果已闭。来源：[官方模型](https://help.ctrader.com/open-api/model-messages/#protooadepthquote)、[深度事件](https://help.ctrader.com/open-api/messages/#protoodepthevent)。
+
+默认 cTrader broker 资金视图也在同候选中接入既有原生 AccountState 的合格 `ctrader_funds`，不要求策略注入 account_provider。`getcash()` 使用原始 free_margin（可用资金，非钱包余额），`getvalue()` 使用原始 equity，避免再叠加浮盈亏；身份、币种、epoch、来源窗口和陈旧度均校验。显式自定义 provider 仍保留；没有 NAV/份额事实时不虚构 fundvalue/fundshares。此为源码与合成原生账户验收，尚未证明新候选自然账户运行。

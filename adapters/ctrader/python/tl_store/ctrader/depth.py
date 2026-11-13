@@ -5,6 +5,7 @@ from decimal import Decimal
 from nautilus_trader.model import (BookType,BookOrder,BookAction,OrderSide,Price,Quantity,
                                   OrderBookDelta,OrderBookDeltas,OrderBookDepth,RecordFlag)
 from .provider import integer
+from .errors import _cleanup_after_failure
 
 BOOK_EVENT_CONTRACT = dict(book_type='L2_MBP',complete=False,source_timestamp_available=False,
                            source_sequence_available=False,order_counts_available=False,
@@ -36,9 +37,10 @@ class DepthProjection:
         self.observed.clear();self.received.clear()
 
     async def fail(self,error):
-        self.invalidate()
-        if self.owner.transport is not None:await self.owner.transport.halt()
-        await self.owner.session.fail(error)
+        operations=[self.invalidate]
+        if self.owner.transport is not None:operations.append(self.owner.transport.halt)
+        operations.append(lambda:self.owner.session.fail(error))
+        await _cleanup_after_failure(self.owner,error,*operations)
 
     async def _epoch(self):
         transport=self.owner.transport

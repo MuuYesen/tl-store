@@ -129,9 +129,12 @@ def build_adapter(config=None, *, account=None, client_id=None, client_secret=No
             raise ValueError('subscription differs from configured cTrader symbols')
         return bar
 
+    from .account_values import CTraderAccountValues
+    account_provider=(config.account_provider if config.account_provider is not None else
+                      CTraderAccountValues(session,config.options.expected_login))
     return dict(api_version=2, config=config.node_config,
         data_factories={'CTRADER': data_factory},
         exec_factories={'CTRADER': exec_factory},
         strategy_config=strategy_config, state_dir=config.state_dir,
-        account_provider=config.account_provider,
+        account_provider=account_provider,
         account_id=f'CTRADER-{config.options.expected_login}', validate_feed=validate_feed, compile_feed=compile_feed, close_adapter=session.close)

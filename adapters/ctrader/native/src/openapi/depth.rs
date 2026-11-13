@@ -84,20 +84,27 @@ impl DepthBook {
         }
         let mut seen = HashSet::new();
         for id in deleted {
-            if *id == 0 || !seen.insert(*id) || !self.entries.contains_key(id) {
+            if *id == 0 || !seen.insert(*id) {
                 return Err("invalid depth deletion");
             }
         }
         let mut added = 0usize;
         for quote in new_quotes {
-            if quote.id == 0 || quote.price == 0 || quote.size == 0 || !seen.insert(quote.id) {
+            if quote.id == 0 || quote.price == 0 || !seen.insert(quote.id) {
                 return Err("invalid or duplicate depth quote");
             }
             if !self.entries.contains_key(&quote.id) {
                 added += 1;
             }
         }
-        if self.entries.len() - deleted.len() + added > self.max_entries {
+        // The broker sends changes, not a certified complete snapshot. A
+        // repeated deletion or a quote never observed in this epoch is a no-op
+        // on our partial view. It must not free nonexistent capacity.
+        let removed = deleted
+            .iter()
+            .filter(|id| self.entries.contains_key(id))
+            .count();
+        if self.entries.len() - removed + added > self.max_entries {
             return Err("depth capacity exceeded");
         }
         let mut bids = BTreeMap::<u64, u64>::new();
@@ -108,6 +115,11 @@ impl DepthBook {
             .filter(|q| !seen.contains(&q.id))
             .chain(new_quotes)
         {
+            // uint64 size includes zero. Retain its quote identity until an
+            // explicit deletion, but never publish a zero-liquidity level.
+            if quote.size == 0 {
+                continue;
+            }
             let levels = match quote.side {
                 Side::Bid => &mut bids,
                 Side::Ask => &mut asks,
@@ -211,8 +223,8 @@ mod tests {
             size: u64::MAX,
         };
         assert!(book.apply(7, &[a, a], &[]).is_err());
-        assert!(
-            book.apply(
+        assert!(book
+            .apply(
                 7,
                 &[
                     a,
@@ -224,10 +236,9 @@ mod tests {
                 ],
                 &[]
             )
-            .is_err()
-        );
-        assert!(
-            book.apply(
+            .is_err());
+        assert!(book
+            .apply(
                 7,
                 &[
                     Quote { size: 1, ..a },
@@ -240,8 +251,7 @@ mod tests {
                 ],
                 &[]
             )
-            .is_err()
-        );
+            .is_err());
     }
 
     #[test]
@@ -283,5 +293,95 @@ mod tests {
         )
         .unwrap();
         assert_eq!(book.levels().unwrap().0, &[(100, 4)]);
+    }
+
+    #[test]
+    fn zero_size_retains_identity_without_publishing_liquidity() {
+        let mut book = DepthBook::new(7, 2).unwrap();
+        let a = Quote {
+            id: 1,
+            side: Side::Bid,
+            price: 100,
+            size: 20,
+        };
+        let zero = Quote {
+            id: 2,
+            price: 999,
+            size: 0,
+            ..a
+        };
+        book.apply(7, &[a, zero], &[]).unwrap();
+        assert_eq!(book.levels().unwrap().0, &[(100, 20)]);
+        assert_eq!(book.entries.len(), 2);
+        book.apply(7, &[Quote { size: 0, ..a }], &[]).unwrap();
+        assert!(book.levels().unwrap().0.is_empty());
+        book.apply(
+            7,
+            &[Quote {
+                price: 100,
+                size: 7,
+                ..zero
+            }],
+            &[],
+        )
+        .unwrap();
+        assert_eq!(book.levels().unwrap().0, &[(100, 7)]);
+        book.apply(7, &[], &[1, 2]).unwrap();
+        assert!(book.entries.is_empty());
+    }
+
+    #[test]
+    fn zero_size_quote_does_not_free_identity_capacity() {
+        let mut book = DepthBook::new(7, 1).unwrap();
+        let zero = Quote {
+            id: 1,
+            side: Side::Bid,
+            price: 100,
+            size: 0,
+        };
+        book.apply(7, &[zero], &[]).unwrap();
+        assert!(book.apply(7, &[Quote { id: 2, ..zero }], &[]).is_err());
+        assert!(book.levels().is_err());
+    }
+
+    #[test]
+    fn repeated_and_unobserved_deletions_are_idempotent_partial_book_changes() {
+        let mut book = DepthBook::new(7, 2).unwrap();
+        let a = Quote {
+            id: 1,
+            side: Side::Bid,
+            price: 100,
+            size: 20,
+        };
+        let b = Quote {
+            id: 2,
+            side: Side::Ask,
+            price: 102,
+            size: 30,
+        };
+        book.apply(7, &[a, b], &[]).unwrap();
+        book.apply(7, &[], &[99]).unwrap();
+        assert_eq!(book.levels().unwrap().0, &[(100, 20)]);
+        book.apply(7, &[], &[1]).unwrap();
+        book.apply(7, &[], &[1]).unwrap();
+        assert!(book.levels().unwrap().0.is_empty());
+        assert_eq!(book.levels().unwrap().1, &[(102, 30)]);
+    }
+
+    #[test]
+    fn unknown_deletion_does_not_free_capacity_or_underflow_observed_count() {
+        let mut book = DepthBook::new(7, 1).unwrap();
+        let a = Quote {
+            id: 1,
+            side: Side::Bid,
+            price: 100,
+            size: 20,
+        };
+        book.apply(7, &[a], &[]).unwrap();
+        assert!(book.apply(7, &[Quote { id: 2, ..a }], &[99]).is_err());
+        assert!(book.levels().is_err());
+        let mut empty = DepthBook::new(7, 1).unwrap();
+        empty.apply(7, &[], &[99]).unwrap();
+        assert!(empty.levels().unwrap().0.is_empty());
     }
 }

@@ -27,8 +27,7 @@ def test_native_depth_update_replace_delete_same_price_and_repeat_are_exact():
     event(newQuotes=[dict(id='1',bid='100',ask='101',size='1')]),
     event(newQuotes=[dict(id=True,bid='100',size='1')]),
     event(newQuotes=[dict(id='1',bid='0',size='1')]),
-    event(newQuotes=[dict(id='1',bid='100',size='0')]),
-    event(deletedQuotes=['999']),
+    event(newQuotes=[dict(id='1',bid='100',size='-1')]),
 ])
 def test_native_malformed_depth_permanently_invalidates_current_epoch(payload):
     b=book()
@@ -53,3 +52,40 @@ def test_native_epoch_capacity_crossed_and_aggregate_overflow_fail_closed():
 @pytest.mark.parametrize('values',[(0,7,3,4),(42,0,3,4),(42,7,0,4),(42,7,3,0),(42,7,3,100001),(True,7,3,4),(42,True,3,4),(42,7,True,4),(42,7,3,True)])
 def test_native_depth_constructor_requires_typed_positive_bounded_scope(values):
     with pytest.raises((ValueError,TypeError)):_native.DepthBook(*values)
+
+
+def test_partial_native_book_unknown_and_repeated_delete_are_idempotent():
+    b=book()
+    initial=apply(b,event(newQuotes=[dict(id='1',bid='100',size='20'),dict(id='2',ask='102',size='30')]))
+    assert apply(b,event(deletedQuotes=['999']))==initial
+    deleted=apply(b,event(deletedQuotes=['1']))
+    assert deleted['bids']==[] and deleted['asks']==[['102','30']]
+    assert apply(b,event(deletedQuotes=['1']))==deleted
+    assert deleted['complete'] is False and deleted['source_ts_ns'] is None
+
+
+def test_unknown_delete_never_creates_capacity_and_other_conflicts_still_invalidate():
+    b=book(1)
+    apply(b,event(newQuotes=[dict(id='1',bid='100',size='20')]))
+    with pytest.raises(ValueError,match='capacity'):
+        apply(b,event(newQuotes=[dict(id='2',bid='99',size='20')],deletedQuotes=['999']))
+    with pytest.raises(ValueError):b.levels()
+    for payload in [event(deletedQuotes=['0']),event(deletedQuotes=['1','1']),event(newQuotes=[dict(id='1',bid='100',size='20')],deletedQuotes=['1'])]:
+        b=book()
+        apply(b,event(newQuotes=[dict(id='1',bid='100',size='20')]))
+        with pytest.raises(ValueError):apply(b,payload)
+        with pytest.raises(ValueError):b.levels()
+
+
+def test_unsigned_zero_size_retains_identity_without_zero_liquidity():
+    b=book(2)
+    initial=apply(b,event(newQuotes=[dict(id='1',bid='100',size='20'),dict(id='2',ask='101',size=0)]))
+    assert initial['bids']==[['100','20']] and initial['asks']==[]
+    assert initial['complete'] is False and initial['source_ts_ns'] is None
+    assert apply(b,event(newQuotes=[dict(id='1',bid='100',size='0')]))['bids']==[]
+    assert apply(b,event(newQuotes=[dict(id='2',ask='101',size='25')]))['asks']==[['101','25']]
+    assert apply(b,event(deletedQuotes=['1','2']))['asks']==[]
+    b=book(1)
+    apply(b,event(newQuotes=[dict(id='1',bid='100',size=0)]))
+    with pytest.raises(ValueError,match='capacity'):
+        apply(b,event(newQuotes=[dict(id='2',bid='99',size=1)]))
