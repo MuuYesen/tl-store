@@ -14,6 +14,67 @@ fn value(e: impl std::fmt::Display) -> PyErr {
 fn operation(name: &str) -> PyResult<ReadOnlyRequest> {
     ReadOnlyRequest::named(name).ok_or_else(|| value("Unknown read-only operation"))
 }
+// One thin Python view over the existing native book/decoder. It owns no
+// connection, OAuth state, execution loop or second quote authority.
+#[pyclass(name = "DepthBook", module = "tl_store.ctrader._native")]
+pub struct NativeDepthBook {
+    inner: crate::openapi::depth::DepthBook,
+    account_id: u64,
+    symbol_id: u64,
+    epoch: u64,
+}
+fn positive_depth_integer(input: &Bound<'_, PyAny>) -> PyResult<u64> {
+    if input.is_instance_of::<pyo3::types::PyBool>() {
+        return Err(value("Depth identity/bound must be a positive integer"));
+    }
+    let number: u64 = input.extract().map_err(value)?;
+    if number == 0 { return Err(value("Depth identity/bound must be positive")); }
+    Ok(number)
+}
+impl NativeDepthBook {
+    fn serialized_levels(&self) -> PyResult<String> {
+        let (bids, asks) = self.inner.levels().map_err(value)?;
+        let pairs = |levels: &[(u64, u64)]| levels.iter()
+            .map(|(p, q)| [p.to_string(), q.to_string()]).collect::<Vec<_>>();
+        serde_json::to_string(&serde_json::json!({
+            "bids": pairs(bids), "asks": pairs(asks),
+            "complete": false, "source_ts_ns": null,
+            "price_scale": 100000, "size_scale": 100
+        })).map_err(value)
+    }
+}
+#[pymethods]
+impl NativeDepthBook {
+    #[new]
+    fn new(account_id: &Bound<'_, PyAny>, symbol_id: &Bound<'_, PyAny>,
+           epoch: &Bound<'_, PyAny>, max_entries: &Bound<'_, PyAny>) -> PyResult<Self> {
+        let account_id = positive_depth_integer(account_id)?;
+        let symbol_id = positive_depth_integer(symbol_id)?;
+        let epoch = positive_depth_integer(epoch)?;
+        let max_entries = usize::try_from(positive_depth_integer(max_entries)?).map_err(value)?;
+        let inner = crate::openapi::depth::DepthBook::new(symbol_id, max_entries).map_err(value)?;
+        Ok(Self { inner, account_id, symbol_id, epoch })
+    }
+    fn apply(&mut self, payload_json: &str, epoch: &Bound<'_, PyAny>) -> PyResult<String> {
+        let result = (|| {
+            if positive_depth_integer(epoch)? != self.epoch {
+                return Err(value("Depth connection epoch mismatch"));
+            }
+            if payload_json.len() > 2 * 1024 * 1024 {
+                return Err(value("Depth event exceeds wire bound"));
+            }
+            let payload: Value = serde_json::from_str(payload_json).map_err(value)?;
+            crate::openapi::depth_wire::apply_event(&mut self.inner,
+                self.account_id, self.symbol_id, &payload).map_err(value)?;
+            self.serialized_levels()
+        })();
+        if result.is_err() { self.inner.invalidate(); }
+        result
+    }
+    fn levels(&self) -> PyResult<String> { self.serialized_levels() }
+    fn invalidate(&mut self) { self.inner.invalidate(); }
+}
+
 #[pyclass(module = "tl_store.ctrader._native")]
 pub struct AccountSession {
     inner: Arc<OpenApiAccountSession>,
@@ -297,5 +358,6 @@ pub fn _native(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(import_oauth_token_state, m)?)?;
     m.add_class::<AccountSession>()?;
     m.add_class::<AccountConnection>()?;
+    m.add_class::<NativeDepthBook>()?;
     Ok(())
 }

@@ -15,6 +15,18 @@
 
 //! One authenticated, continuously drained JSON WebSocket for read-only account data.
 
+fn readonly_rejection(payload: &serde_json::Value) -> anyhow::Error {
+    // Preserve only the protocol error code, never description or account/order
+    // payload. Invalid/non-code content remains explicitly unavailable.
+    let code = payload.get("errorCode").and_then(serde_json::Value::as_str)
+        .filter(|s| !s.is_empty() && s.len() <= 128
+            && s.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_' || b == b'-'));
+    match code {
+        Some(code) => anyhow::anyhow!("Open API rejected request [errorCode={code}]"),
+        None => anyhow::anyhow!("Open API rejected request"),
+    }
+}
+
 use super::{OpenApiConfig, OpenApiCredentials, ReadOnlyRequest};
 use crate::clock::monotonic_ns as posix_monotonic_ns;
 use crate::openapi::model::{BrokerAccountSnapshot, BrokerDeal};
@@ -376,7 +388,7 @@ impl OpenApiClient {
                                 receive_mono_ns: received_mono_ns,
                             })
                         } else if matches!(payload_type, 50 | 2142) {
-                            Err(anyhow!("Open API rejected request"))
+                            Err(readonly_rejection(&payload))
                         } else {
                             Err(anyhow!("Open API response type mismatch"))
                         };
@@ -906,6 +918,19 @@ fn wire_u64(value: &Value) -> Option<u64> {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn readonly_rejected_request_preserves_only_bounded_protocol_code() {
+        let safe = super::readonly_rejection(&serde_json::json!({
+            "errorCode":"NOT_AUTHORIZED", "description":"fixture-private-description",
+            "ctidTraderAccountId":42}));
+        assert_eq!(safe.to_string(), "Open API rejected request [errorCode=NOT_AUTHORIZED]");
+        for code in ["", "unsafe description", "token\nvalue", &"X".repeat(129)] {
+            assert_eq!(super::readonly_rejection(&serde_json::json!({"errorCode":code}))
+                .to_string(), "Open API rejected request");
+        }
+        assert_eq!(super::readonly_rejection(&serde_json::json!({})).to_string(),
+            "Open API rejected request");
+    }
     use super::*;
     use rust_decimal::Decimal;
     use tokio::{net::TcpListener, time::timeout};
@@ -1032,6 +1057,12 @@ mod tests {
                 }
                 let mut response = json!({"clientMsgId": request["clientMsgId"],
                     "payloadType": response_type, "payload": payload});
+                if let Some(error_type) = request["payload"]["mockRejectType"].as_u64() {
+                    response = json!({"clientMsgId":request["clientMsgId"],
+                        "payloadType":error_type,"payload":{
+                        "errorCode":"CH_DEPTH_QUOTES_NOT_SUPPORTED",
+                        "description":"fixture-private-description"}});
+                }
                 if omit_payload_for == Some(kind) {
                     response.as_object_mut().unwrap().remove("payload");
                 }
@@ -1042,7 +1073,7 @@ mod tests {
                     .send(Message::Text(response.to_string().into()))
                     .await
                     .unwrap();
-                if kind == 2156 {
+                if kind == 2156 && request["payload"]["mockRejectType"].is_null() {
                     socket
                         .send(Message::Text(
                             json!({"payloadType":2155,"payload":{
@@ -1083,6 +1114,22 @@ mod tests {
             client_id: "mock-id".to_owned(),
             client_secret: "mock-secret".to_owned(),
             access_token: "mock-token".to_owned(),
+        }
+    }
+
+    #[tokio::test]
+    async fn readonly_depth_correlated_errors_keep_only_protocol_code_and_healthy_epoch() {
+        for error_type in [50, 2142] {
+            let (endpoint, closed) = mock_endpoint_with_events(Some(0), 100_001, vec![], false).await;
+            let client = OpenApiClient::connect_to(&endpoint,
+                OpenApiConfig::demo(100_001), dummy_credentials()).await.unwrap();
+            let error = client.request(ReadOnlyRequest::SubscribeDepthQuotes,
+                json!({"symbolId":[7],"mockRejectType":error_type})).await.unwrap_err();
+            assert_eq!(error.to_string(),
+                "Open API rejected request [errorCode=CH_DEPTH_QUOTES_NOT_SUPPORTED]");
+            assert!(client.account_snapshot().await.is_ok());
+            client.close().await;
+            timeout(Duration::from_secs(2),closed).await.unwrap().unwrap();
         }
     }
 

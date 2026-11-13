@@ -17,11 +17,15 @@ class NativeTransport:
         return self.connection.epoch
 
     async def request(self, name, payload):
-        return json.loads(
-            await self.connection.request(
-                name, json.dumps(payload, separators=(",", ":"))
-            )
-        )
+        try:
+            result=await self.connection.request(name,json.dumps(payload,separators=(",", ":")))
+        except RuntimeError as error:
+            import re
+            from .errors import CTraderRequestRejected
+            match=re.fullmatch(r'Open API rejected request(?: \[errorCode=([A-Za-z0-9_-]{1,128})\])?',str(error))
+            if match:raise CTraderRequestRejected(match.group(1)) from None
+            raise
+        return json.loads(result)
 
     async def snapshot(self, lookback_ms=86400000, require_flat=False):
         return json.loads(await self.connection.snapshot(lookback_ms, require_flat))

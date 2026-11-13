@@ -16,7 +16,7 @@ Linux aarch64 are **build-only, not runtime-tested**. Alpha status and the fixed
 official NA release-candidate dependency remain explicit.
 
 The GitHub repository and history remain private. Each public wheel supplies
-483 necessary source/license/build files and all 233 locked vendor crates under
+484 necessary source/license/build files (a6 closure; a5 had483) and all 233 locked vendor crates under
 `.dist-info/corresponding-source`; private Git access is unnecessary to rebuild.
 There is no public standalone Store sdist or private-history attachment.
 
@@ -135,3 +135,19 @@ Strategies, deployment configuration, accounts, credentials and internal operati
 records are excluded. See [LICENSE](LICENSE) and component notices. Existing
 copyright headers are retained. Backtrader was an API reference only; no GPL
 Backtrader implementation or singleton was copied.
+
+
+## Standard observed depth bridge (0.2.1a6)
+
+The a6 implementation provides the four official NA book subscription and
+unsubscription hooks with one native `DepthBook` per bound account/symbol/epoch.
+The existing read-only market lease/OAuth/2155 reader is reused. `L2_MBP` deltas
+use `OrderBookDeltas`; snapshot subscriptions use fixed NA2rc7's actual
+`OrderBookDepth` type. No `OrderBookDepth10` import, new protocol or Engine
+strategy method is introduced. Native price/centi-size validation and normal
+unsubscribe/failure paths remain explicit. See the adapter's [depth contract](adapters/ctrader/README.md#standard-observed-depth-a6).
+
+This section describes versioned contents, not actual broker entitlement. Exact
+source/wheel/CI/public-install receipts determine distribution qualification.
+a5 consumer installations remain unchanged until an explicit qualified upgrade. A Store-only adapter release does
+not require an unchanged TradeLearn release or strategy upgrade.

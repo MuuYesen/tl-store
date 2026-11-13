@@ -85,7 +85,9 @@ def test_same_native_lifecycle_releases_adapter_on_exit_and_failure(tmp_path, mo
     async def close():calls.append('close')
     store._close_adapter=close
     async def drain():calls.append('drain')
-    host=SimpleNamespace(frontend=None,drain=drain)
+    # Newer TL also releases native host ownership after disposal. This mock
+    # deliberately owns no native references; older formal TL needs no hook.
+    host=SimpleNamespace(frontend=None,drain=drain,_release_runtime_owner=lambda:None)
     monkeypatch.setattr(store,'_make_host',lambda engine:host)
     class Node:
         def handle(self):return self

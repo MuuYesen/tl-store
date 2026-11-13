@@ -219,3 +219,51 @@ independent adapter revision until a later TL extra is qualified. Existing IC
 installations need not wait for this read-only change. Public wheel source/license/
 build material delivery stays under `.dist-info/corresponding-source`; no standalone
 source or private-history publication is added.
+
+
+<a id="standard-observed-depth-a6"></a>
+## Standard observed depth (0.2.1a6 contract)
+
+`CTraderDataClient` implements `_subscribe_book_deltas`, `_unsubscribe_book_deltas`,
+`_subscribe_book_depth` and `_unsubscribe_book_depth` through the same factory,
+`execution=False, market=True` lease and event reader. Commands require
+`BookType.L2_MBP`; `depth=None/0` selects all currently observed levels up to the
+1000-level output bound, positive integer depth selects a prefix. Limits are ten
+symbols and10000 native entries each, matching the existing native100000 total
+entry bound. Mode subscriptions for a symbol share its native request/book;
+concurrent modes await the same real subscribe ACK. Last-mode unsubscribe sends
+one real unsubscribe request. Normal disconnect withdraws remaining subscriptions
+and always releases its lease; unknown unsubscribe failure is not successful ACK.
+
+The original native `DepthBook`/`depth_wire` owns quote IDs, insert/replace/delete,
+same-price aggregation, crossed/overflow/capacity and identity validation. Its
+Python extension is a thin export, not a Python order book or another execution
+loop. `OrderBookDeltas` publishes a grouped CLEAR plus ADD of the known observed
+view, with MBP and final-record flags. `_subscribe_book_depth` publishes fixed
+NA2rc7 `OrderBookDepth` directly (that release exports no `OrderBookDepth10`).
+The two output types go through standard `_handle_data`/`_output.data`.
+
+Protocol2155 supplies no source timestamp, source sequence, full-market snapshot
+or customer-order count. Output `ts_event=0` and `sequence=0` explicitly mean
+unavailable; `ts_init` is the original positive native receive UTC clock, not a
+new publication time. Consumers map source timestamp to null and keep
+`complete=false`; no F_SNAPSHOT claim is added. Depth order counts are zero as
+unavailable metadata, not evidence of zero underlying orders. Raw price/100000
+and size/100 are converted with Decimal and exact instrument precision; rounding
+is rejected. A depth event never advances QuoteTick source clock/freshness.
+
+On a changed transport epoch, invalid identity/side/price/size, wire/capacity or
+precision error, the native book is invalidated and the existing halt/session
+failure path closes admission. A new connection requires a new book; no hidden
+reconnect or stale-epoch replay occurs. Repeated valid updates replace native
+quote IDs; an unprovable duplicate deletion remains a fail-closed invalid event.
+Collector should map these standard observed snapshots into its current view;
+raw2155 tee is evidence only, not another independently accumulated book.
+
+Correlated read-only50/2142 errors preserve only the original bounded protocol
+`errorCode`, exposed as `tl_store.ctrader.errors.CTraderRequestRejected.error_code`.
+Descriptions/account/order payloads are excluded. A missing or non-code field is
+None, not a manufactured broker code. Other native failures retain their original
+type/cause. Actual account/symbol depth entitlement and2157/2155/error evidence
+are a separate authorized read-only consumer qualification, not implied by
+quotes, factory construction or offline tests. No orders are used for this gate.

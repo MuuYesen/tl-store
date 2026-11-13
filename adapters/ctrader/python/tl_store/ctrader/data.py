@@ -18,6 +18,9 @@ class CTraderDataClient(MarketDataClient):
         self._sides = {}
         self._reader = None
         self._last_source_ts = 0
+        from .depth import DepthProjection
+        self._depth = DepthProjection(self)
+        self._depth_modes, self._depth_books = self._depth.modes, self._depth.books
 
     async def _connect(self):
         try:
@@ -48,6 +51,9 @@ class CTraderDataClient(MarketDataClient):
         finally:
             self._reader = None
             if self.transport:
+                depth = getattr(self, '_depth', None)
+                if depth is not None:
+                    self.background_errors.extend(await depth.shutdown())
                 await self.transport.close()
             self.transport = None
             self._sides.clear()
@@ -93,6 +99,8 @@ class CTraderDataClient(MarketDataClient):
         except asyncio.CancelledError:
             raise
         except BaseException as error:
+            depth = getattr(self, '_depth', None)
+            if depth is not None:depth.invalidate()
             if self.transport is not None:
                 await self.transport.halt()
             await self.session.fail(error)
@@ -101,6 +109,9 @@ class CTraderDataClient(MarketDataClient):
     async def _events_inner(self):
         while True:
             event = await self.transport.next_event()
+            if event["payload_type"] == 2155:
+                await self._depth.event(event)
+                continue
             if event["payload_type"] != 2131:
                 continue
             payload = event["payload"]
@@ -143,6 +154,18 @@ class CTraderDataClient(MarketDataClient):
                     received,
                 )
             )
+
+    async def _subscribe_book_deltas(self, command):
+        await self._depth.subscribe(command, 'deltas')
+
+    async def _unsubscribe_book_deltas(self, command):
+        await self._depth.unsubscribe(command, 'deltas')
+
+    async def _subscribe_book_depth(self, command):
+        await self._depth.subscribe(command, 'depth')
+
+    async def _unsubscribe_book_depth(self, command):
+        await self._depth.unsubscribe(command, 'depth')
 
     async def _subscribe_instruments(self, command):
         for spec in self.contracts.values():

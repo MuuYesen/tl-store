@@ -11,3 +11,5 @@ dist/
 .tradelearn/
 
 .DS_Store
+
+.qualification/

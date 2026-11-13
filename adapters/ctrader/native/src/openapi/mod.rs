@@ -17,8 +17,8 @@
 //! Read-only request and observer interfaces cannot represent trading mutations.
 
 mod client;
-mod depth;
-mod depth_wire;
+pub(crate) mod depth;
+pub(crate) mod depth_wire;
 pub mod funds;
 mod market_stream;
 pub mod model;
